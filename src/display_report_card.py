@@ -1025,7 +1025,7 @@ def render_brightness(ax: plt.Axes, brightness: BrightnessCurve | None) -> None:
         return
     x = brightness.brightness_percent
     y = brightness.luminance
-    ax.plot(x, y, "o-", color="#0072B2", linewidth=1.4, markersize=3.8, label="measured")
+    ax.plot(x, y, "o-", color="#0072B2", linewidth=1.4, markersize=2.6, label="measured")
     if brightness.expected_luminance:
         ax.plot(x, brightness.expected_luminance, "--", color="#6B7682", linewidth=1.0, label="expected")
     ax.set_xlabel("Brightness command (%)", fontsize=7)
@@ -1053,7 +1053,7 @@ def render_gamma(ax: plt.Axes, gamma: GammaCurve | None) -> None:
         gamma.normalized_luminance,
         "o",
         color="#0072B2",
-        markersize=3.5,
+        markersize=2.4,
         label="measured",
         zorder=5,
     )
@@ -1142,7 +1142,7 @@ def render_gamut(
         measured = [gamut.points["R"], gamut.points["G"], gamut.points["B"], gamut.points["R"]]
         ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label="measured")
     if gamut.white_point:
-        ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=4.5, label="white")
+        ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=3.0, label="white")
         coverage_parts = []
         white_parts = []
         if gamut.coverage_percent is not None:
