@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "disp-report-card"
+version = "0.1.0"
+description = "Single-run automated display test report-card generator"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "matplotlib",
+  "numpy<2",
+]
+
+[project.optional-dependencies]
+advanced = [
+  "colour-science==0.4.6",
+]
+
+[project.scripts]
+display-report-card = "display_report_card:main"
+
+[tool.setuptools]
+py-modules = ["display_report_card"]
+
+[tool.setuptools.package-dir]
+"" = "src"

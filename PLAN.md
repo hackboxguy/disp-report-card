@@ -11,7 +11,8 @@
 - Done: switched the default gamut panel to NTSC 1953 primaries with D65 white reference.
 - Done: added gamut coverage, relative area, D65 tolerance, and white-point distance indicators.
 - Done: added `--render basic|advanced`; `basic` stays lightweight and `advanced` uses optional host-PC chromaticity rendering when available.
-- Next: refine packaging, parser tests, and future artifact support as needed.
+- Done: added packaging metadata, a console entry point, repeatable make targets, and edge-case parser tests.
+- Next: add future structured brightness/stability artifact support when those tester artifacts are available.
 
 ## Phase 1: Loader And Metadata
 
@@ -62,6 +63,9 @@
 - Done: document CLI usage in `README.md`.
 - Done: document Python dependencies and optional advanced rendering behavior.
 - Done: add focused tests for fixture parsing and current gamma path fallback.
+- Done: add `pyproject.toml` with `display-report-card` console entry point.
+- Done: add `Makefile` targets for tests and sample report regeneration.
+- Done: add tests for missing `summary.json`, `report-metadata.json` header overrides, missing gamma artifacts, and malformed optional raw JSON.
 - Keep commits scoped to one implementation milestone at a time.
 
 ## Open Implementation Notes

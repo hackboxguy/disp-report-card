@@ -258,14 +258,19 @@ def derive_display_size(display_model: str) -> str:
     return f'{token}"'
 
 
-def discover_tests(run_dir: Path) -> dict[str, RawTest]:
+def discover_tests(run_dir: Path, warnings: list[str] | None = None) -> dict[str, RawTest]:
     raw_dir = run_dir / "raw"
     tests: dict[str, RawTest] = {}
     if not raw_dir.exists():
         return tests
 
     for path in sorted(raw_dir.glob("*.json")):
-        data = load_json(path)
+        try:
+            data = load_json(path)
+        except (OSError, json.JSONDecodeError) as exc:
+            if warnings is not None:
+                warnings.append(f"skipping unreadable raw test JSON {path.name}: {exc}")
+            continue
         name = str(get_nested(data, "test_info", "name", default=path.stem))
         tests[name] = RawTest(name=name, path=path, data=data)
     return tests
@@ -860,7 +865,7 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
         raise FileNotFoundError(f"missing required file: {summary_path}")
 
     summary = load_json(summary_path)
-    tests = discover_tests(run_dir)
+    tests = discover_tests(run_dir, warnings)
     header = resolve_header_metadata(run_dir, summary, tests, args)
     status_rows = extract_status_rows(tests)
     brightness = extract_brightness(tests)

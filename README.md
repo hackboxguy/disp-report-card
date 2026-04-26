@@ -35,6 +35,20 @@ python3 src/display_report_card.py \
   --output out/run-20260426-085300-report-card.png
 ```
 
+For repeated use on a development host, install the local console command inside a virtualenv:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install --no-deps --no-build-isolation -e .
+
+.venv/bin/display-report-card \
+  --input test-data/12-3-nq1v1 \
+  --output out/run-20260426-085300-report-card.png
+```
+
+On Raspberry Pi targets, the direct script path remains the simplest basic-mode invocation when
+dependencies are provided by apt packages.
+
 Options:
 
 - `--input` - required result folder.
@@ -52,21 +66,10 @@ ellipse of `0.010`.
 ## Verification
 
 ```bash
-python3 -m py_compile src/display_report_card.py
-python3 -m unittest discover -s tests
+make test
 
-python3 src/display_report_card.py \
-  --input test-data/12-3-nq1v1 \
-  --output out/12-3-report-card.png
-
-python3 src/display_report_card.py \
-  --input test-data/15-6-0od \
-  --output out/15-6-report-card.png
-
-python3 src/display_report_card.py \
-  --input test-data/15-6-0od \
-  --output out/15-6-report-card-advanced.png \
-  --render advanced
+make report-samples
+make report-samples-advanced PYTHON=.venv/bin/python
 ```
 
 Expected output size at the default DPI is `2338 x 1654` pixels.
@@ -84,6 +87,8 @@ python3 -m venv --system-site-packages .venv
   --input test-data/15-6-0od \
   --output out/15-6-report-card-advanced.png \
   --render advanced
+
+make report-samples-advanced PYTHON=.venv/bin/python
 ```
 
 `python3-colour` is a different package and does not provide `colour.plotting`. Version
