@@ -924,8 +924,13 @@ def render_report_card(
     render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings)
     render_footer(ax_footer, run)
 
+    fig.patch.set_facecolor("white")
+    fig.patch.set_alpha(1.0)
+    for ax in fig.axes:
+        ax.patch.set_alpha(1.0)
+
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi, facecolor="white")
+    fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
     plt.close(fig)
 
 
@@ -982,8 +987,8 @@ def render_kpis(ax: plt.Axes, run: RunData) -> None:
         ax.add_patch(
             Rectangle((x, 0.06), tile_w, 0.88, transform=ax.transAxes, facecolor="#FFFFFF", edgecolor="#D9E0E7", linewidth=0.8)
         )
-        ax.text(x + 0.02, 0.64, value, fontsize=14, weight="bold", color=color, transform=ax.transAxes)
-        ax.text(x + 0.02, 0.25, label, fontsize=7.5, color="#586472", transform=ax.transAxes)
+        ax.text(x + 0.02, 0.58, value, fontsize=14, weight="bold", color=color, va="center", transform=ax.transAxes)
+        ax.text(x + 0.02, 0.24, label, fontsize=7.5, color="#586472", va="center", transform=ax.transAxes)
 
 
 def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
@@ -1034,7 +1039,16 @@ def render_brightness(ax: plt.Axes, brightness: BrightnessCurve | None) -> None:
     ax.set_ylim(bottom=0)
     ax.legend(loc="upper left", fontsize=6, frameon=False)
     if y:
-        ax.text(0.98, 0.05, f"Peak {max(y):.1f} nits", ha="right", transform=ax.transAxes, fontsize=6.5, color="#4F5965")
+        ax.text(
+            0.98,
+            0.05,
+            f"Peak {max(y):.1f} nits",
+            ha="right",
+            transform=ax.transAxes,
+            fontsize=7.2,
+            color="#111111",
+            weight="bold",
+        )
 
 
 def render_gamma(ax: plt.Axes, gamma: GammaCurve | None) -> None:
@@ -1157,12 +1171,13 @@ def render_gamut(
         annotation = "\n".join(" | ".join(parts) for parts in (coverage_parts, white_parts) if parts)
         if annotation:
             ax.text(
-                0.02,
+                0.98,
                 0.055,
                 annotation,
                 transform=ax.transAxes,
                 fontsize=5.55,
                 color="#4F5965",
+                ha="right",
                 linespacing=1.15,
                 bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2},
             )
