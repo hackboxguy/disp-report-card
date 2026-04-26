@@ -70,6 +70,7 @@ make test
 
 make report-samples
 make report-samples-advanced PYTHON=.venv/bin/python
+make clean
 ```
 
 Expected output size at the default DPI is `2338 x 1654` pixels.
