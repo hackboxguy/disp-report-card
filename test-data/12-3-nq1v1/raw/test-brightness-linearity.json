@@ -1,0 +1,211 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-brightness-linearity-20260426-090429",
+  "test_info": {
+    "name": "test-brightness-linearity",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Validate brightness linearity against calibration reference",
+    "file": "tests/02-validation/test-brightness-linearity.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T07:02:50Z",
+    "end_time": "2026-04-26T07:04:29Z",
+    "duration_ms": 99000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "calibration_file": "/home/pi/micropanel/share/disptool/display-test-framework/config/calibration/12.3-nq1-lattice-ecp5-brightness.json",
+    "test_points": "0 12.5 25 37.5 50 62.5 75 87.5 100",
+    "tolerance_percent": 5,
+    "total_points": 9,
+    "passed_points": 9,
+    "failed_points": 0,
+    "measured_data": [{
+      "brightness_percent": 0,
+      "luminance": 0.071328,
+      "expected_luminance": 0,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "0.069956 0.071328 0.009738",
+      "chromaticity": "0.463218 0.472299",
+      "raw_measurement": "04/26/26,09:02:59,N/A,SENSOR,0.069956,0.071328,0.009738,0.071328,0.463218,0.472299,N/A,N/A,100"
+    }, {
+      "brightness_percent": 12.5,
+      "luminance": 137.372441,
+      "expected_luminance": 138.884863,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "138.086726 137.372441 167.772507",
+      "chromaticity": "0.311545 0.309934",
+      "raw_measurement": "04/26/26,09:03:21,N/A,SENSOR,138.086726,137.372441,167.772507,137.372441,0.311545,0.309934,N/A,N/A,100"
+    }, {
+      "brightness_percent": 25,
+      "luminance": 267.719697,
+      "expected_luminance": 271.044281,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "269.110153 267.719697 326.715453",
+      "chromaticity": "0.311634 0.310024",
+      "raw_measurement": "04/26/26,09:03:27,N/A,SENSOR,269.110153,267.719697,326.715453,267.719697,0.311634,0.310024,N/A,N/A,100"
+    }, {
+      "brightness_percent": 37.5,
+      "luminance": 408.243007,
+      "expected_luminance": 413.012256,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "410.095814 408.243007 498.428882",
+      "chromaticity": "0.311441 0.310034",
+      "raw_measurement": "04/26/26,09:03:44,N/A,SENSOR,410.095814,408.243007,498.428882,408.243007,0.311441,0.310034,N/A,N/A,100"
+    }, {
+      "brightness_percent": 50,
+      "luminance": 537.647540,
+      "expected_luminance": 542.9235,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "540.126797 537.647540 656.847088",
+      "chromaticity": "0.311380 0.309951",
+      "raw_measurement": "04/26/26,09:03:49,N/A,SENSOR,540.126797,537.647540,656.847088,537.647540,0.311380,0.309951,N/A,N/A,100"
+    }, {
+      "brightness_percent": 62.5,
+      "luminance": 674.594445,
+      "expected_luminance": 679.793822,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "677.667520 674.594445 825.057736",
+      "chromaticity": "0.311239 0.309828",
+      "raw_measurement": "04/26/26,09:03:55,N/A,SENSOR,677.667520,674.594445,825.057736,674.594445,0.311239,0.309828,N/A,N/A,100"
+    }, {
+      "brightness_percent": 75,
+      "luminance": 804.518930,
+      "expected_luminance": 809.217836,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "808.416497 804.518930 985.042623",
+      "chromaticity": "0.311171 0.309671",
+      "raw_measurement": "04/26/26,09:04:00,N/A,SENSOR,808.416497,804.518930,985.042623,804.518930,0.311171,0.309671,N/A,N/A,100"
+    }, {
+      "brightness_percent": 87.5,
+      "luminance": 941.835918,
+      "expected_luminance": 945.235259,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "946.495134 941.835918 1154.296870",
+      "chromaticity": "0.311078 0.309547",
+      "raw_measurement": "04/26/26,09:04:16,N/A,SENSOR,946.495134,941.835918,1154.296870,941.835918,0.311078,0.309547,N/A,N/A,100"
+    }, {
+      "brightness_percent": 100,
+      "luminance": 1068.406039,
+      "expected_luminance": 1069.564562,
+      "power": {
+        "voltage": "N/A",
+        "current": "N/A",
+        "watts_total": "N/A",
+        "watts_baseline": "0",
+        "watts_display": "N/A"
+      },
+      "rgb_luminance": "1073.797742 1068.406039 1310.959801",
+      "chromaticity": "0.310961 0.309399",
+      "raw_measurement": "04/26/26,09:04:21,N/A,SENSOR,1073.797742,1068.406039,1310.959801,1068.406039,0.310961,0.309399,N/A,N/A,100"
+    }]
+  },
+  "validation": {
+    "checks": [{
+      "name": "brightness_0_linearity",
+      "expected": "0±1",
+      "actual": "0.071328",
+      "result": "PASS"
+    }, {
+      "name": "brightness_12.5_linearity",
+      "expected": "138.884863±5%",
+      "actual": "137.372441",
+      "result": "PASS"
+    }, {
+      "name": "brightness_25_linearity",
+      "expected": "271.044281±5%",
+      "actual": "267.719697",
+      "result": "PASS"
+    }, {
+      "name": "brightness_37.5_linearity",
+      "expected": "413.012256±5%",
+      "actual": "408.243007",
+      "result": "PASS"
+    }, {
+      "name": "brightness_50_linearity",
+      "expected": "542.9235±5%",
+      "actual": "537.647540",
+      "result": "PASS"
+    }, {
+      "name": "brightness_62.5_linearity",
+      "expected": "679.793822±5%",
+      "actual": "674.594445",
+      "result": "PASS"
+    }, {
+      "name": "brightness_75_linearity",
+      "expected": "809.217836±5%",
+      "actual": "804.518930",
+      "result": "PASS"
+    }, {
+      "name": "brightness_87.5_linearity",
+      "expected": "945.235259±5%",
+      "actual": "941.835918",
+      "result": "PASS"
+    }, {
+      "name": "brightness_100_linearity",
+      "expected": "1069.564562±5%",
+      "actual": "1068.406039",
+      "result": "PASS"
+    }],
+    "passed": 9,
+    "failed": 0
+  },
+  "errors": []
+}

@@ -1,0 +1,6 @@
+[08:53:03] Reading FPGA ID register...
+[08:53:04] Disp-Resolution: 1920x720 [OK]
+[08:53:04] Board-Type: lattice-ecp5 [OK]
+[08:53:04] Disp-Size: 12.3" [OK]
+[08:53:04] Validating against display model config...
+[08:53:04] FPGA ID read validation: PASS

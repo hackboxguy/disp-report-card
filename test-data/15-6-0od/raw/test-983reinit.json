@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-983reinit-20260426-080625",
+  "test_info": {
+    "name": "test-983reinit",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read 983_manager FPD-Link re-init status (and optionally trigger)",
+    "file": "tests/00-unit/test-983reinit.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:06:25Z",
+    "end_time": "2026-04-26T06:06:25Z",
+    "duration_ms": 0,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "slave_address": "0x67",
+    "status": "idle (0x00)",
+    "last_error": "none (0x00)",
+    "trigger_tested": "no"
+  },
+  "validation": {
+    "checks": [{
+      "name": "read_exit_ok",
+      "expected": "0 or 2",
+      "actual": "0",
+      "result": "PASS"
+    }],
+    "passed": 1,
+    "failed": 0
+  },
+  "errors": []
+}

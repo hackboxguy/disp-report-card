@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-brightness-calibration-20260426-081547",
+  "test_info": {
+    "name": "test-brightness-calibration",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Calibrate brightness → luminance curve using i1DisplayPro",
+    "file": "tests/02-validation/test-brightness-calibration.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:06:45Z",
+    "end_time": "2026-04-26T06:15:47Z",
+    "duration_ms": 542000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "calibration_file": "/home/pi/micropanel/share/disptool/display-test-framework/config/calibration/15.6-0od-lattice-ecp5-brightness.json",
+    "total_samples": 81,
+    "brightness_range": "0%-100%",
+    "brightness_step": "1.25%"
+  },
+  "validation": {
+    "checks": [{
+      "name": "calibration_file_created",
+      "expected": "file exists",
+      "actual": "created",
+      "result": "PASS"
+    }],
+    "passed": 1,
+    "failed": 0
+  },
+  "errors": []
+}

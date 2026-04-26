@@ -1,0 +1,568 @@
+# Display Report Card PRD
+
+## Objective
+
+Create a lightweight Python report card generator that reads one automated display test result folder and produces one A4-sized PNG report card for that single run.
+
+The first implementation is per-run only. Cross-run comparison is explicitly out of scope for v1.
+
+## Primary Goals
+
+- Generate one report card per result folder.
+- Use existing structured test JSON files as the primary input source.
+- Support placeholder header fields until the automated tester is extended.
+- Render a clean single-sheet graphical summary suitable for screen viewing and printing.
+- Keep runtime dependencies light enough to run on Raspberry Pi 4.
+
+## Non-Goals
+
+- Multi-run comparison or trend-over-history reporting.
+- PDF, HTML, or web dashboard output.
+- Dependence on heavy scientific/reporting packages such as `pandas`, `shapely`, `colour`, `plotly`, or browser-based renderers.
+- Rewriting or mutating the original result folder contents.
+
+## Output
+
+- One PNG per input run.
+- Recommended format: A4 landscape.
+- Default DPI: 200.
+- Expected pixel size: 2339 x 1654.
+- Recommended output filename: `<run_id>-report-card.png`.
+
+Landscape is preferred over portrait because the report needs to fit a header, status summary, a full test matrix, and multiple charts on one page without becoming unreadable.
+
+## Expected Inputs
+
+### Existing Input Files
+
+- `summary.json`
+- `raw/*.json`
+- `raw/*.log`
+- `artifacts/*.csv`
+
+### Current Extended Input Files
+
+- `raw/test-gamma-curve.json`
+- `artifacts/gamma_curve_test-gamma-curve.csv`
+- `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
+
+### Planned Future Inputs
+
+- `report-metadata.json`
+- Structured 81-step brightness calibration artifact
+- Optional structured gamma sweep JSON artifact
+- Structured white soak / stability artifact
+
+The generator should work immediately with current folders and placeholders, then automatically consume the richer artifacts once they appear.
+
+## Header Fields
+
+The report card header should contain:
+
+- Test date/time
+- Display size
+- Display resolution
+- Display serial number
+- Display image processor SW version (FPGA)
+- Optional display built-in MCU SW version
+- Tester version
+- Run ID
+
+## Header Field Source Priority
+
+### Test date/time
+
+1. `summary.json.timestamp`
+2. Placeholder: `TBD`
+
+### Display size
+
+1. `report-metadata.json.display_size`
+2. `raw/test-fpgaid-read.json.data.disp_size`
+3. Derive from model string if possible
+4. Placeholder: `TBD`
+
+### Display resolution
+
+1. `report-metadata.json.display_resolution`
+2. `raw/test-fpgaid-read.json.data.disp_resolution`
+3. Placeholder: `TBD`
+
+### Display serial number
+
+1. `report-metadata.json.display_serial_number`
+2. Future `raw/test-display-serial-read.json.data.serial_number`
+3. Placeholder: `DUMMY-SERIAL-NUMBER`
+
+### FPGA SW version
+
+1. `report-metadata.json.fpga_sw_version`
+2. `raw/test-version-read.json.data.version`
+3. Placeholder: `DUMMY-FPGA-VERSION`
+
+Useful companion text, if available:
+
+- FPGA date from `raw/test-version-read.json.data.date`
+- FPGA binary from `raw/test-version-read.json.data.binary`
+
+### MCU SW version
+
+1. `report-metadata.json.mcu_sw_version`
+2. `raw/test-iocversion-read.json.data.fw_version`
+3. If not available, show `N/A`
+
+### Tester version
+
+1. `report-metadata.json.tester_version`
+2. `summary.json.framework_version` if later added there
+3. `raw/*/environment.framework_version` if consistent
+4. Placeholder: `DUMMY-TESTER-VERSION`
+
+### Run ID
+
+1. `summary.json.run_id`
+2. Folder name
+
+## High-Level Layout
+
+### Row 1: Header Band
+
+- Product title: `Display Test Report Card`
+- Run ID
+- Test timestamp
+- Display identity fields
+- Software identity fields
+
+### Row 2: Summary Status Band
+
+Compact KPI tiles:
+
+- Overall result summary
+- Passed count
+- Failed count
+- Error count
+- Skipped count
+- Executed pass rate
+
+`Executed pass rate` should be computed as:
+
+- `passed / (passed + failed + errors)`
+
+This is more informative than using `total_tests`, because model-specific `SKIP` cases are expected and should not reduce the effective pass rate.
+
+### Main Body: Left / Right Split
+
+#### Left Side
+
+Full test status matrix:
+
+- One row per test
+- Columns:
+  - test name
+  - category
+  - result
+  - compact note
+
+Result coloring:
+
+- `PASS`: green
+- `SKIP`: gray
+- `ERROR`: red
+- `FAIL`: orange-red if such a state appears later
+
+Compact notes should explain the most relevant issue, for example:
+
+- `no ALS sensor`
+- `FPGA ID read error`
+- `I2C flood 399/400`
+- `BIST failed 5/5`
+
+The matrix should always show the test-level `execution.result`. Charts may still render from partial structured data when a test result is `ERROR`, as long as usable measurement samples were written.
+
+#### Right Side
+
+2 x 2 chart grid:
+
+1. Brightness calibration curve
+2. Gamma curve
+3. Contrast curve
+4. Gamut / white-point plot
+
+### Footer Band
+
+If soak data is not available:
+
+- Show issue summary and key observations.
+
+If soak data is available:
+
+- Use the footer band for three mini trend plots:
+  - temperature vs time
+  - white luminance vs time
+  - white-point drift vs time
+
+This dynamic footer keeps the single-sheet format while allowing future stability data to appear without redesigning the whole page.
+
+## Required Charts
+
+### 1. Brightness Calibration Curve
+
+Purpose:
+
+- Show the full 81-step backlight response.
+
+Preferred data source:
+
+- Future structured 81-step artifact
+
+Fallback:
+
+- If the 81-step artifact is missing, render the 9-point `brightness-linearity` data instead.
+
+Plotted series:
+
+- x-axis: brightness command percent
+- y-axis: measured luminance `Y`
+
+Useful overlays:
+
+- measured curve
+- optional monotonic trend line
+- optional markers every 12.5%
+
+This chart is about backlight response, not gamma.
+
+### 2. Gamma Curve
+
+Purpose:
+
+- Show grayscale electro-optical response.
+
+Data sources, in priority order:
+
+1. `raw/test-gamma-curve.json` plus the referenced/current CSV artifact.
+2. Future `raw/test-gamma-grayscale.json` plus `data.artifact_json` or `data.artifact_csv`.
+3. Future standalone `artifacts/gamma-grayscale.json`.
+4. Future standalone `artifacts/gamma-grayscale.csv`.
+
+Current gamma extension:
+
+- Main test JSON: `raw/test-gamma-curve.json`
+- Forward curve CSV: `artifacts/gamma_curve_test-gamma-curve.csv`
+- Optional inverse LUT CSV: `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
+
+The current JSON may contain absolute Pi-side paths in `data.csv_path` and `data.progress_log`. The report generator should first resolve paths relative to the input run folder. If a stored absolute path does not exist on the local machine, it should fall back to `artifacts/<basename>` inside the copied run folder.
+
+Expected current CSV columns:
+
+- `code`
+- `R`, `G`, `B`
+- `X_mean`, `Y_mean`, `Z_mean`
+- `x_mean`, `y_mean`
+- `Y_std`
+- `samples`
+- `attempts`
+- `status`
+
+Only rows with `status == OK` should be plotted.
+
+Plotted series:
+
+- reference gamma 2.2
+- reference gamma 2.4
+- measured normalized curve
+- optional fitted measured gamma curve, if it remains legible
+
+Derived metrics:
+
+- fitted measured gamma
+- deviation vs 2.2
+- deviation vs 2.4
+- RMS residual for the measured gamma fit, if available
+- RMS residual for sRGB, if available
+- black luminance
+- peak luminance
+- patch count and samples per patch
+
+Recommended display:
+
+- annotate measured gamma near the legend or title
+- use normalized axes from 0.0 to 1.0
+- annotate `Y_black`, `Y_max`, and endpoint drift if the code-255 sample does not equal the reported `Y_max`
+
+Normalization rule:
+
+- Prefer `raw/test-gamma-curve.json.data.y_black_nits` and `raw/test-gamma-curve.json.data.y_max_nits` when present.
+- Otherwise use the minimum and maximum valid `Y_mean` values from the gamma CSV.
+- Compute normalized luminance as `(Y_mean - Y_black) / (Y_max - Y_black)`.
+- This preserves visible endpoint drift when the measured code-255 sample is below the separately measured peak reference.
+
+Important:
+
+- Do not derive display gamma from backlight calibration data.
+- Gamma must come from grayscale patch measurements at fixed backlight.
+- Do not embed the full standalone `gamma-tools/visualize-gamma.py` four-panel diagnostic layout into the report card. Reuse its lightweight parsing and fitting approach where useful, but render one compact report-card gamma panel.
+
+### 3. Contrast Curve
+
+Purpose:
+
+- Show how contrast behaves across tested brightness levels.
+
+Data source:
+
+- `raw/test-contrast-sequential.json`
+
+Plotted series:
+
+- x-axis: brightness level
+- y-axis: contrast ratio
+
+Rendering notes:
+
+- use log scale for y-axis
+- if the test marks black below detection threshold, keep the `>` semantics in annotation
+- draw point labels or a subtitle such as `contrast values are lower bounds`
+- render available contrast measurements even when `raw/test-contrast-sequential.json.execution.result` is `ERROR`
+- annotate missing brightness levels or test errors in the panel subtitle or footer observations
+
+### 4. Gamut / White-Point Plot
+
+Purpose:
+
+- Show measured RGB triangle and measured white point against a configured reference gamut.
+
+Preferred reference:
+
+- `sRGB / Rec.709` by default
+
+Configurable reference options:
+
+- `srgb`
+- `rec709`
+- `dcip3`
+- `ntsc`
+- `rec2020`
+
+Rendering strategy for lightweight execution:
+
+- Avoid heavy chromaticity diagram packages in v1.
+- Render a simplified `x/y` chromaticity plot with axes, measured RGB triangle, reference triangle, and white-point markers.
+- This is sufficient for the report card and much lighter than a full CIE spectral locus implementation.
+
+Annotated metrics:
+
+- white luminance at 100%
+- measured white point `(x, y)`
+- reference white point `(x, y)`
+- `delta x`
+- `delta y`
+
+## Optional Future Footer Charts
+
+If the soak test is available, the footer should show:
+
+- backlight temperature rise and stabilization
+- white luminance drift over time
+- white-point drift over time
+
+Recommended derived metrics:
+
+- initial temperature
+- peak temperature
+- final stabilized temperature
+- luminance drift percent from start to end
+- max white-point drift
+
+## Data Extraction Strategy
+
+## Primary Rule
+
+Use structured JSON or CSV artifacts first. Parse logs only as backward-compatibility fallback.
+
+### Current Test Files Already Useful
+
+- `summary.json`
+- `raw/test-version-read.json`
+- `raw/test-iocversion-read.json`
+- `raw/test-fpgaid-read.json`
+- `raw/test-bltemp-read.json`
+- `raw/test-rtq6749-status.json`
+- `raw/test-i2c-flood.json`
+- `raw/test-brightness-linearity.json`
+- `raw/test-color-gamut.json`
+- `raw/test-contrast-sequential.json`
+- `raw/test-gamma-curve.json`
+- `artifacts/gamma_curve_test-gamma-curve.csv`
+
+### Current Gap
+
+- The existing `test-brightness-calibration.json` contains only summary metadata.
+- The full 81-step calibration sweep is only present in the log today.
+- The generator should support temporary log parsing for this one test if needed, but the preferred long-term solution is a structured artifact.
+- The current gamma extension writes structured CSV and summary JSON, but not yet a standalone JSON sample artifact. The report generator should consume the CSV directly and should not parse gamma logs.
+
+### Artifact Path Resolution
+
+Artifact paths should be resolved in this order:
+
+1. Relative path from the input run folder.
+2. Relative path from the raw test JSON file's parent folder, if applicable.
+3. Absolute path exactly as recorded, only if it exists.
+4. `artifacts/<basename-of-recorded-path>` inside the input run folder.
+
+The generator should warn, not crash, when an optional artifact path cannot be resolved.
+
+## Placeholder Policy
+
+The generator must not fail because optional metadata is missing.
+
+Rules:
+
+- Missing non-critical header values should render as `TBD`, `N/A`, or a clearly marked dummy string.
+- Missing optional charts should render a compact placeholder panel such as `Gamma data not available`.
+- Missing critical files such as `summary.json` should stop execution with a clear error.
+
+## CLI Proposal
+
+Recommended first CLI:
+
+```bash
+python3 display-report-card.py \
+  --input run-result-12-3 \
+  --output out/run-20260413-224139-report-card.png
+```
+
+Recommended optional flags:
+
+- `--metadata report-metadata.json`
+- `--reference-gamut srgb`
+- `--dpi 200`
+- `--title`
+- `--serial-number`
+- `--tester-version`
+
+CLI overrides are useful during the transition period before all metadata is produced by the automated tests.
+
+## Runtime and Dependency Requirements
+
+Preferred dependencies:
+
+- Python standard library
+- `numpy`
+- `matplotlib`
+
+`matplotlib` is acceptable for report-card rendering and is not considered a heavy dependency for this project. Use the Agg backend for headless Raspberry Pi execution.
+
+Avoid for v1:
+
+- `pandas`
+- `shapely`
+- `colour`
+- `seaborn`
+- HTML/CSS renderers
+
+Pi 4 considerations:
+
+- use `matplotlib` Agg backend
+- avoid oversized canvases
+- avoid repeated figure creation where possible
+- avoid expensive spectral-locus plotting
+
+Gamma implementation guidance:
+
+- Reuse or adapt the lightweight CSV parsing, gamma fitting, reference-curve prediction, and optional inverse-LUT loading approach from `gamma-tools/visualize-gamma.py`.
+- Keep the report card's gamma chart simpler than `visualize-gamma.py`: one compact normalized EOTF panel is preferred over residual, inverse-LUT, and chromaticity subplots.
+- If future report space allows, gamma chromaticity drift or inverse-LUT details can be added to a separate diagnostic report, not the single-sheet card.
+
+## Proposed Internal Architecture
+
+Start with one script and small helper classes/functions rather than a large package.
+
+Suggested logical components:
+
+- `load_run_folder()`
+- `resolve_header_metadata()`
+- `extract_test_statuses()`
+- `extract_calibration_curve()`
+- `extract_gamma_curve()`
+- `extract_contrast_curve()`
+- `extract_gamut_metrics()`
+- `extract_stability_metrics()`
+- `render_report_card()`
+
+If the script grows later, it can be split into modules, but v1 should stay simple.
+
+## Visual Style Requirements
+
+- Clean engineering report aesthetic
+- Legible at A4 print scale
+- Consistent typography and spacing
+- Minimal but clear color usage
+- No dark theme
+- No decorative gradients or heavy branding
+- Clear labels over visual novelty
+
+## Error Handling
+
+The script should:
+
+- fail fast for missing core files
+- continue gracefully when optional files are missing
+- collect warnings during parsing
+- show a warning summary in stdout or stderr
+- not crash because a single optional test artifact is absent
+
+## Backward Compatibility Strategy
+
+The script should support three phases:
+
+### Phase 1
+
+- consume existing result folders
+- use placeholders for missing header fields
+- use 9-point brightness-linearity if full calibration artifact is missing
+- omit gamma and soak charts if not available
+
+### Phase 2
+
+- consume structured 81-step calibration artifact
+- consume display serial number
+- consume tester version metadata
+- consume current `test-gamma-curve` CSV artifacts when present
+
+### Phase 3
+
+- consume future dedicated gamma JSON artifact, if added
+- consume long-duration white soak stability test
+- dynamically populate the footer mini plots
+
+## Acceptance Criteria
+
+- A valid result folder produces one PNG without manual editing.
+- The PNG contains the agreed header fields, using placeholders if needed.
+- All test result files appear in the test matrix.
+- Brightness linearity, gamma, contrast, and gamut panels render from current extended data when present.
+- Partial chart data is rendered when available even if the corresponding test result is `ERROR`.
+- The script runs on Raspberry Pi 4 with lightweight dependencies only.
+- Missing optional inputs do not crash the script.
+- Future structured artifacts can be added without redesigning the report layout.
+
+## Open Decisions
+
+- Final reference gamut default. Current recommendation: `sRGB / Rec.709`.
+- Exact placeholder strings for missing metadata.
+- Whether to show `errors` and `fails` as separate colors if future tests distinguish them more clearly.
+- Whether the footer should prefer stability plots or issue notes when both are available.
+
+## Recommended Immediate Implementation Order
+
+1. Implement the per-run loader and header resolution with placeholders.
+2. Render summary tiles and full test matrix.
+3. Render current charts from existing JSON:
+   - brightness-linearity
+   - contrast
+   - gamut
+4. Add support for current `test-gamma-curve` CSV artifacts.
+5. Add support for structured 81-step calibration artifact.
+6. Add support for soak stability artifact.

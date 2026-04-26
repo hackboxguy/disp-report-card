@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-tpreset-readwrite-20260426-080629",
+  "test_info": {
+    "name": "test-tpreset-readwrite",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read touch panel reset pin state, verify normal operation",
+    "file": "tests/00-unit/test-tpreset-readwrite.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:06:29Z",
+    "end_time": "2026-04-26T06:06:29Z",
+    "duration_ms": 0,
+    "exit_code": 2,
+    "result": "SKIP",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {},
+  "validation": {
+    "checks": [],
+    "passed": 0,
+    "failed": 0
+  },
+  "errors": ["Test skipped: TP reset disabled via IOC_TP_RESET_ENABLED=no"]
+}

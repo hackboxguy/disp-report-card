@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-contrast-sequential-20260426-082027",
+  "test_info": {
+    "name": "test-contrast-sequential",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Measure display contrast ratio at multiple brightness levels",
+    "file": "tests/02-validation/test-contrast-sequential.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:18:29Z",
+    "end_time": "2026-04-26T06:20:27Z",
+    "duration_ms": 118000,
+    "exit_code": 3,
+    "result": "ERROR",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "brightness_levels": [12.5, 25, 50, 75, 100],
+    "settle_time": 3,
+    "min_contrast_spec": 1000,
+    "contrast_measurements": [{
+      "brightness": 12.5,
+      "white_luminance": 89.914256,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 8991.4,
+      "contrast_ratio_display": ">8991.4",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 50,
+      "white_luminance": 353.491383,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 35349.1,
+      "contrast_ratio_display": ">35349.1",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 75,
+      "white_luminance": 531.184859,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 53118.4,
+      "contrast_ratio_display": ">53118.4",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 100,
+      "white_luminance": 708.590720,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 70859.0,
+      "contrast_ratio_display": ">70859.0",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }]
+  },
+  "validation": {
+    "checks": [{
+      "name": "total_measurements",
+      "expected": "5 expected",
+      "actual": "4 measured",
+      "result": "PASS"
+    }, {
+      "name": "contrast_at_50%",
+      "expected": ">= 1000:1",
+      "actual": ">35349.1:1",
+      "result": "PASS"
+    }],
+    "passed": 2,
+    "failed": 0
+  },
+  "errors": ["Failed to show whitebox pattern at brightness 25"]
+}

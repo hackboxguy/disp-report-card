@@ -1,0 +1,6 @@
+[08:06:30] Reading FPGA version register...
+[08:06:31] Date: March 27 [OK]
+[08:06:31] Binary: 00 [OK]
+[08:06:31] Version: v02 [OK]
+[08:06:31] Validating against display model config...
+[08:06:31] Version read validation: PASS

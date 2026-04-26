@@ -1,0 +1,32 @@
+[09:02:52] Validation parameters:
+[09:02:52]   Test points: 0 12.5 25 37.5 50 62.5 75 87.5 100%
+[09:02:52]   Tolerance: ±5%
+[09:02:52]   Settle time: 2s per point
+[09:02:52] Using calibration file: /home/pi/micropanel/share/disptool/display-test-framework/config/calibration/12.3-nq1-lattice-ecp5-brightness.json
+[09:02:52] 
+[09:02:52] Optional accessories:
+[09:02:52]   ⓘ Power supply (ka3005p): Not available (measurements will be skipped)
+[09:02:52] 
+[09:02:52] Showing white pattern for measurements...
+[09:02:54] White pattern active
+[09:02:55] 
+[09:02:55] Starting validation measurements...
+[09:03:18] Brightness     0%: [0;32mPASS[0m (luminance near zero)
+[09:03:23] Brightness  12.5%: [0;32mPASS[0m (deviation: 0%)
+[09:03:40] Brightness    25%: [0;32mPASS[0m (deviation: 0%)
+[09:03:46] Brightness  37.5%: [0;32mPASS[0m (deviation: 0%)
+[09:03:51] Brightness    50%: [0;32mPASS[0m (deviation: 0%)
+[09:03:57] Brightness  62.5%: [0;32mPASS[0m (deviation: 0%)
+[09:04:13] Brightness    75%: [0;32mPASS[0m (deviation: 0%)
+[09:04:18] Brightness  87.5%: [0;32mPASS[0m (deviation: 0%)
+[09:04:29] Brightness   100%: [0;32mPASS[0m (deviation: 0%)
+[09:04:29] 
+[09:04:29] Validation complete!
+[09:04:29]   Total points: 9
+[09:04:29]   Passed: [0;32m9[0m
+[09:04:29]   Failed: [0;31m0[0m
+[09:04:29] 
+[09:04:29] Brightness linearity validation: [0;32mPASS[0m
+[09:04:29] 
+[09:04:29] Turning off pattern...
+[09:04:29] Pattern turned off

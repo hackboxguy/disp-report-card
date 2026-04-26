@@ -1,0 +1,134 @@
+measure-display.sh:  /home/pi/micropanel/share/disptool/display-test-framework/measure-display.sh
+disptool:            /home/pi/micropanel/bin/disptool
+launcher-client:     /home/pi/micropanel/usr/bin/launcher-client
+Backlight:           will pin to 100% via disptool globaldim2
+Sweep:               33 patches, 3 samples each, ~16.5 min estimated
+Output CSV:          /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_curve_test-gamma-curve.csv
+note: captured original als-dimmer state mode='auto', brightness='50'
+ok: backlight pinned at 100% via als-dimmer
+
+range check: measuring RGB(0,0,0), RGB(16,16,16), RGB(32,32,32) ...
+ok: HDMI range is FULL — Y(0)=0.00, Y(16)=2.07, Y(32)=12.60
+
+ambient: measuring RGB(0,0,0) for black level ...
+ok: Y_black = 0.000 nits (std 0.000, n=3, attempts=1)
+
+peak: measuring RGB(255,255,255) for Y_max reference ...
+ok: Y_max = 1065.87 nits (std 1.082, n=3), contrast ratio ≈ inf:1
+
+[  1/33] code   0 -> 
+           Y =     0.00 nits  (std 0.000, 46.4s)
+[  2/33] code   8 -> 
+           Y =     0.47 nits  (std 0.000, 18.6s)
+[  3/33] code  16 -> 
+           Y =     2.07 nits  (std 0.000, 15.7s)
+[  4/33] code  24 -> 
+           Y =     7.30 nits  (std 0.003, 14.3s)
+[  5/33] code  32 -> 
+           Y =    12.58 nits  (std 0.003, 19.7s)
+[  6/33] code  40 -> 
+           Y =    19.57 nits  (std 0.009, 13.6s)
+[  7/33] code  48 -> 
+           Y =    28.66 nits  (std 0.040, 19.1s)
+[  8/33] code  56 -> 
+           Y =    40.86 nits  (std 0.000, 12.9s)
+[  9/33] code  64 -> 
+           Y =    56.07 nits  (std 0.000, 24.3s)
+[ 10/33] code  72 -> 
+           Y =    71.06 nits  (std 0.070, 12.8s)
+[ 11/33] code  80 -> 
+           Y =    89.77 nits  (std 0.073, 29.5s)
+[ 12/33] code  88 -> 
+           Y =   109.95 nits  (std 0.071, 18.0s)
+[ 13/33] code  96 -> 
+           Y =   131.48 nits  (std 0.111, 12.8s)
+[ 14/33] code 104 -> 
+WARN: patch code=104 failed ('exit 1: stderr=\'de: R=104 G=104 B=104\\nINFO: Measuring custom RGB sample: R=104 G=104 B=104\\nINFO: Attempting to reset i1Display Pro USB device...\\nERROR: Could not reset USB device - device not found or insufficient permissions\\nERROR: RGB sample measurement failed after 3 attempts\\nERROR: RGB sample measurement failed\'; stdout=\'{"timestamp":"04/26/26,09:14:19","color":"RGB-104-104-104","error":"measurement_failed","temp":"N/A","voltage":"N/A","current":"N/A","brightness":100}\'; cmd=\'/home/pi/micropanel/share/disptool/display-test-framework/measure-display.sh --red=104 --green=104 --blue=104 --brlevel=100 --measurement-delay=5 --format=json --compact=yes\''); retry 1/1 in 2s
+           Y =   154.42 nits  (std 0.001, 37.5s (after 2 attempts))
+[ 15/33] code 112 -> 
+           Y =   183.08 nits  (std 0.073, 18.4s)
+[ 16/33] code 120 -> 
+           Y =   210.04 nits  (std 0.041, 17.4s)
+[ 17/33] code 128 -> 
+           Y =   246.03 nits  (std 0.084, 23.7s)
+[ 18/33] code 135 -> 
+           Y =   253.64 nits  (std 0.125, 18.5s)
+[ 19/33] code 143 -> 
+           Y =   286.50 nits  (std 0.085, 12.8s)
+[ 20/33] code 151 -> 
+           Y =   321.97 nits  (std 0.084, 18.0s)
+[ 21/33] code 159 -> 
+           Y =   361.96 nits  (std 0.073, 12.8s)
+[ 22/33] code 167 -> 
+           Y =   414.50 nits  (std 0.085, 12.8s)
+[ 23/33] code 175 -> 
+           Y =   457.60 nits  (std 0.085, 12.9s)
+[ 24/33] code 183 -> 
+           Y =   503.81 nits  (std 0.084, 17.6s)
+[ 25/33] code 191 -> 
+           Y =   556.38 nits  (std 0.146, 12.9s)
+[ 26/33] code 199 -> 
+           Y =   609.59 nits  (std 0.234, 12.9s)
+[ 27/33] code 207 -> 
+           Y =   667.70 nits  (std 0.043, 12.8s)
+[ 28/33] code 215 -> 
+           Y =   723.89 nits  (std 0.084, 18.5s)
+[ 29/33] code 223 -> 
+           Y =   780.99 nits  (std 0.125, 12.9s)
+[ 30/33] code 231 -> 
+           Y =   848.80 nits  (std 0.144, 17.8s)
+[ 31/33] code 239 -> 
+           Y =   916.05 nits  (std 0.295, 18.4s)
+[ 32/33] code 247 -> 
+           Y =   975.52 nits  (std 0.165, 12.9s)
+[ 33/33] code 255 -> 
+           Y =  1049.99 nits  (std 0.370, 27.8s)
+
+CSV written: /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_curve_test-gamma-curve.csv
+
+Panel response: Y_max = 1065.87 nits, Y_black = 0.000 nits, CR = inf:1
+  Pure power law fit:   γ = 2.187, RMS log residual = 0.0680 (n=32)
+  sRGB standard model:               RMS log residual = 0.3568 (n=32)  [γ=2.4 piecewise, fixed]
+  → pure power law fits better (lower RMS residual)
+
+  code | Y_meas (nits) | Y_fit_γ (nits) | err_γ %  | Y_fit_sRGB (nits) | err_sRGB %
+  -----+---------------+----------------+----------+-------------------+-----------
+    0  |      0.000    |  (black ref)   |   --     |  (black ref)      |   --
+    8  |       0.47    |       0.55     |  -14.94 |       2.59        |  -81.94
+   16  |       2.07    |       2.50     |  -17.30 |       5.52        |  -62.54
+   24  |       7.30    |       6.07     |  +20.23 |       9.74        |  -25.02
+   32  |      12.58    |      11.39     |  +10.42 |      15.40        |  -18.31
+   40  |      19.57    |      18.55     |   +5.48 |      22.62        |  -13.47
+   48  |      28.66    |      27.64     |   +3.67 |      31.50        |   -9.04
+   56  |      40.86    |      38.72     |   +5.53 |      42.15        |   -3.05
+   64  |      56.07    |      51.86     |   +8.13 |      54.65        |   +2.61
+   72  |      71.06    |      67.09     |   +5.91 |      69.07        |   +2.88
+   80  |      89.77    |      84.48     |   +6.27 |      85.50        |   +4.99
+   88  |     109.95    |     104.05     |   +5.67 |     104.02        |   +5.71
+   96  |     131.48    |     125.86     |   +4.46 |     124.68        |   +5.46
+  104  |     154.42    |     149.94     |   +2.99 |     147.55        |   +4.65
+  112  |     183.08    |     176.32     |   +3.84 |     172.70        |   +6.01
+  120  |     210.04    |     205.03     |   +2.44 |     200.19        |   +4.92
+  128  |     246.03    |     236.11     |   +4.20 |     230.08        |   +6.93
+  135  |     253.64    |     265.27     |   -4.38 |     258.24        |   -1.78
+  143  |     286.50    |     300.86     |   -4.77 |     292.77        |   -2.14
+  151  |     321.97    |     338.89     |   -4.99 |     329.85        |   -2.39
+  159  |     361.96    |     379.39     |   -4.60 |     369.54        |   -2.05
+  167  |     414.50    |     422.39     |   -1.87 |     411.88        |   +0.63
+  175  |     457.60    |     467.90     |   -2.20 |     456.93        |   +0.15
+  183  |     503.81    |     515.95     |   -2.35 |     504.72        |   -0.18
+  191  |     556.38    |     566.55     |   -1.80 |     555.32        |   +0.19
+  199  |     609.59    |     619.74     |   -1.64 |     608.75        |   +0.14
+  207  |     667.70    |     675.53     |   -1.16 |     665.06        |   +0.40
+  215  |     723.89    |     733.93     |   -1.37 |     724.31        |   -0.06
+  223  |     780.99    |     794.97     |   -1.76 |     786.52        |   -0.70
+  231  |     848.80    |     858.67     |   -1.15 |     851.74        |   -0.35
+  239  |     916.05    |     925.04     |   -0.97 |     920.02        |   -0.43
+  247  |     975.52    |     994.11     |   -1.87 |     991.38        |   -1.60
+  255  |    1049.99    |    1065.87     |   -1.49 |    1065.87        |   -1.49
+
+Inverse LUT: /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv (256 entries)
+  Use for software linearisation: look up target relative luminance (0..1), get the code value to send to the display.
+
+pattern: stopped pattern-generator (returned to home screen)
+backlight: restored to 50% mode=auto via als-dimmer

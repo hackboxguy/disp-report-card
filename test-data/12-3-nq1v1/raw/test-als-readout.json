@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-als-readout-20260426-085301",
+  "test_info": {
+    "name": "test-als-readout",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Validate ALS sensor readout stability (no zero values)",
+    "file": "tests/00-unit/test-als-readout.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:53:01Z",
+    "end_time": "2026-04-26T06:53:01Z",
+    "duration_ms": 0,
+    "exit_code": 2,
+    "result": "SKIP",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {},
+  "validation": {
+    "checks": [],
+    "passed": 0,
+    "failed": 0
+  },
+  "errors": ["Test skipped: Display model 12.3-nq1-lattice-ecp5 does not have a light sensor"]
+}

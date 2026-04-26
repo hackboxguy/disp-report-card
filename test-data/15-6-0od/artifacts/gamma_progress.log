@@ -1,0 +1,133 @@
+measure-display.sh:  /home/pi/micropanel/share/disptool/display-test-framework/measure-display.sh
+disptool:            /home/pi/micropanel/bin/disptool
+launcher-client:     /home/pi/micropanel/usr/bin/launcher-client
+Backlight:           will pin to 100% via disptool globaldim2
+Sweep:               33 patches, 3 samples each, ~16.5 min estimated
+Output CSV:          /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-080625/artifacts/gamma_curve_test-gamma-curve.csv
+note: captured original als-dimmer state mode='auto', brightness='50'
+ok: backlight pinned at 100% via als-dimmer
+
+range check: measuring RGB(0,0,0), RGB(16,16,16), RGB(32,32,32) ...
+ok: HDMI range is FULL — Y(0)=0.00, Y(16)=0.76, Y(32)=5.00
+
+ambient: measuring RGB(0,0,0) for black level ...
+ok: Y_black = 0.000 nits (std 0.000, n=3, attempts=1)
+
+peak: measuring RGB(255,255,255) for Y_max reference ...
+ok: Y_max = 1102.43 nits (std 0.966, n=3), contrast ratio ≈ inf:1
+
+[  1/33] code   0 -> 
+           Y =     0.00 nits  (std 0.000, 46.3s)
+[  2/33] code   8 -> 
+           Y =     0.25 nits  (std 0.000, 20.1s)
+[  3/33] code  16 -> 
+           Y =     0.76 nits  (std 0.000, 17.1s)
+[  4/33] code  24 -> 
+           Y =     2.31 nits  (std 0.000, 21.1s)
+[  5/33] code  32 -> 
+           Y =     4.99 nits  (std 0.002, 14.5s)
+[  6/33] code  40 -> 
+           Y =     8.71 nits  (std 0.001, 20.4s)
+[  7/33] code  48 -> 
+           Y =    13.85 nits  (std 0.004, 13.9s)
+[  8/33] code  56 -> 
+           Y =    21.03 nits  (std 0.011, 13.5s)
+[  9/33] code  64 -> 
+           Y =    30.83 nits  (std 0.039, 13.5s)
+[ 10/33] code  72 -> 
+           Y =    41.98 nits  (std 0.000, 12.8s)
+[ 11/33] code  80 -> 
+           Y =    55.09 nits  (std 0.042, 12.9s)
+[ 12/33] code  88 -> 
+           Y =    70.77 nits  (std 0.085, 12.8s)
+[ 13/33] code  96 -> 
+           Y =    89.75 nits  (std 0.073, 17.4s)
+[ 14/33] code 104 -> 
+           Y =   109.62 nits  (std 0.041, 12.9s)
+[ 15/33] code 112 -> 
+           Y =   134.66 nits  (std 0.071, 18.3s)
+[ 16/33] code 120 -> 
+           Y =   160.48 nits  (std 0.070, 18.9s)
+[ 17/33] code 128 -> 
+           Y =   192.88 nits  (std 0.146, 18.2s)
+[ 18/33] code 135 -> 
+           Y =   203.52 nits  (std 0.086, 25.0s)
+[ 19/33] code 143 -> 
+           Y =   236.67 nits  (std 0.041, 12.9s)
+[ 20/33] code 151 -> 
+           Y =   275.09 nits  (std 0.073, 12.9s)
+[ 21/33] code 159 -> 
+           Y =   315.57 nits  (std 0.083, 18.9s)
+[ 22/33] code 167 -> 
+           Y =   359.66 nits  (std 0.074, 15.0s)
+[ 23/33] code 175 -> 
+           Y =   407.04 nits  (std 0.110, 12.8s)
+[ 24/33] code 183 -> 
+           Y =   458.94 nits  (std 0.124, 29.7s)
+[ 25/33] code 191 -> 
+           Y =   511.56 nits  (std 0.039, 17.7s)
+[ 26/33] code 199 -> 
+           Y =   576.70 nits  (std 0.045, 12.9s)
+[ 27/33] code 207 -> 
+           Y =   636.50 nits  (std 0.110, 19.3s)
+[ 28/33] code 215 -> 
+           Y =   700.22 nits  (std 0.073, 12.9s)
+[ 29/33] code 223 -> 
+           Y =   773.16 nits  (std 0.291, 18.0s)
+[ 30/33] code 231 -> 
+           Y =   848.64 nits  (std 0.110, 12.9s)
+[ 31/33] code 239 -> 
+           Y =   922.72 nits  (std 0.255, 18.3s)
+[ 32/33] code 247 -> 
+           Y =   996.44 nits  (std 0.252, 18.4s)
+[ 33/33] code 255 -> 
+           Y =  1077.55 nits  (std 0.295, 17.7s)
+
+CSV written: /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-080625/artifacts/gamma_curve_test-gamma-curve.csv
+
+Panel response: Y_max = 1102.43 nits, Y_black = 0.000 nits, CR = inf:1
+  Pure power law fit:   γ = 2.537, RMS log residual = 0.0946 (n=32)
+  sRGB standard model:               RMS log residual = 0.7356 (n=32)  [γ=2.4 piecewise, fixed]
+  → pure power law fits better (lower RMS residual)
+
+  code | Y_meas (nits) | Y_fit_γ (nits) | err_γ %  | Y_fit_sRGB (nits) | err_sRGB %
+  -----+---------------+----------------+----------+-------------------+-----------
+    0  |      0.000    |  (black ref)   |   --     |  (black ref)      |   --
+    8  |       0.25    |       0.17     |  +46.19 |       2.68        |  -90.77
+   16  |       0.76    |       0.98     |  -22.77 |       5.71        |  -86.74
+   24  |       2.31    |       2.74     |  -15.75 |      10.07        |  -77.04
+   32  |       4.99    |       5.69     |  -12.39 |      15.92        |  -68.67
+   40  |       8.71    |      10.03     |  -13.17 |      23.39        |  -62.77
+   48  |      13.85    |      15.93     |  -13.06 |      32.58        |  -57.50
+   56  |      21.03    |      23.55     |  -10.71 |      43.60        |  -51.77
+   64  |      30.83    |      33.05     |   -6.72 |      56.52        |  -45.46
+   72  |      41.98    |      44.56     |   -5.79 |      71.44        |  -41.24
+   80  |      55.09    |      58.21     |   -5.36 |      88.44        |  -37.70
+   88  |      70.77    |      74.14     |   -4.54 |     107.58        |  -34.22
+   96  |      89.75    |      92.45     |   -2.93 |     128.95        |  -30.40
+  104  |     109.62    |     113.27     |   -3.22 |     152.61        |  -28.17
+  112  |     134.66    |     136.70     |   -1.49 |     178.63        |  -24.61
+  120  |     160.48    |     162.85     |   -1.46 |     207.06        |  -22.50
+  128  |     192.88    |     191.83     |   +0.55 |     237.97        |  -18.95
+  135  |     203.52    |     219.57     |   -7.31 |     267.10        |  -23.80
+  143  |     236.67    |     254.10     |   -6.86 |     302.81        |  -21.84
+  151  |     275.09    |     291.74     |   -5.71 |     341.17        |  -19.37
+  159  |     315.57    |     332.56     |   -5.11 |     382.22        |  -17.44
+  167  |     359.66    |     376.67     |   -4.52 |     426.01        |  -15.57
+  175  |     407.04    |     424.15     |   -4.04 |     472.60        |  -13.87
+  183  |     458.94    |     475.09     |   -3.40 |     522.03        |  -12.09
+  191  |     511.56    |     529.57     |   -3.40 |     574.36        |  -10.93
+  199  |     576.70    |     587.67     |   -1.87 |     629.62        |   -8.40
+  207  |     636.50    |     649.47     |   -2.00 |     687.87        |   -7.47
+  215  |     700.22    |     715.06     |   -2.08 |     749.15        |   -6.53
+  223  |     773.16    |     784.51     |   -1.45 |     813.49        |   -4.96
+  231  |     848.64    |     857.90     |   -1.08 |     880.95        |   -3.67
+  239  |     922.72    |     935.30     |   -1.34 |     951.57        |   -3.03
+  247  |     996.44    |    1016.78     |   -2.00 |    1025.38        |   -2.82
+  255  |    1077.55    |    1102.43     |   -2.26 |    1102.43        |   -2.26
+
+Inverse LUT: /home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-080625/artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv (256 entries)
+  Use for software linearisation: look up target relative luminance (0..1), get the code value to send to the display.
+
+pattern: stopped pattern-generator (returned to home screen)
+backlight: restored to 50% mode=auto via als-dimmer

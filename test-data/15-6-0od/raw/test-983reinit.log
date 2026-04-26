@@ -1,0 +1,4 @@
+[08:06:25] Reading 983 reinit status (read-only)...
+[08:06:25] Status: idle (0x00) [OK]
+[08:06:25] Last Error: none (0x00) [OK]
+[08:06:25] Skipping re-init trigger (set IOC_REINIT_WRITE_ENABLED=yes to enable)

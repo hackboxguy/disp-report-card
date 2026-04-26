@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-bltemp-read-20260426-080627",
+  "test_info": {
+    "name": "test-bltemp-read",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read backlight NTC temperature and validate within operating range",
+    "file": "tests/00-unit/test-bltemp-read.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:06:26Z",
+    "end_time": "2026-04-26T06:06:27Z",
+    "duration_ms": 1000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "raw_bytes": "0x0b 0xf0 0x01 0x02",
+    "adc_raw": "3056",
+    "temperature_degc": "25.8",
+    "range_min": "-20",
+    "range_max": "85"
+  },
+  "validation": {
+    "checks": [{
+      "name": "disptool_exit_code",
+      "expected": "0",
+      "actual": "0",
+      "result": "PASS"
+    }, {
+      "name": "temp_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "adc_nonzero",
+      "expected": ">0",
+      "actual": "3056",
+      "result": "PASS"
+    }, {
+      "name": "temp_in_range",
+      "expected": "-20-85",
+      "actual": "25.8",
+      "result": "PASS"
+    }],
+    "passed": 4,
+    "failed": 0
+  },
+  "errors": []
+}

@@ -1,0 +1,582 @@
+# Display Extended Tests PRD
+
+## Objective
+
+Extend the automated display test framework so that each run folder contains the metadata and structured measurement artifacts required by the per-run report card generator.
+
+The main goal is to stop relying on human-readable logs for report generation.
+
+## Primary Goals
+
+- Add missing report-header metadata to each run.
+- Add structured 81-step brightness calibration data.
+- Add or standardize a dedicated grayscale gamma curve test.
+- Add a long-duration white soak stability test.
+- Preserve raw measurement data even when a validation result is `FAIL` or `ERROR`.
+- Keep output compatible with the existing JSON schema style already used by the automated tests.
+
+## Non-Goals
+
+- Multi-run comparison logic
+- Web dashboard output
+- Heavy post-processing inside the automated test scripts
+- Encoding report-card rendering logic into the tester itself
+
+## Required New Output Files
+
+Each run folder should eventually contain:
+
+- `summary.json`
+- `report-metadata.json`
+- `raw/test-display-serial-read.json`
+- `raw/test-gamma-curve.json`
+- Optional compatibility alias: `raw/test-gamma-grayscale.json`
+- `raw/test-white-soak-stability.json`
+- Structured calibration artifact file
+- Structured gamma artifact file
+- Structured soak artifact file
+
+Recommended artifact directory:
+
+- `artifacts/`
+
+Recommended examples:
+
+- `artifacts/brightness-calibration-81step.csv`
+- `artifacts/brightness-calibration-81step.json`
+- `artifacts/gamma_curve_test-gamma-curve.csv`
+- `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
+- `artifacts/gamma-grayscale.csv`
+- `artifacts/gamma-grayscale.json`
+- `artifacts/white-soak-stability.csv`
+- `artifacts/white-soak-stability.json`
+
+Using both CSV and JSON is acceptable, but JSON is the preferred machine-readable source for the report generator. CSV is useful for manual inspection and spreadsheet work.
+
+All artifact paths recorded in raw test JSON should be relative to the run folder. Absolute Pi-side paths are acceptable in human-readable logs, but they should not be the only machine-readable artifact references because copied run folders must remain portable.
+
+## Run-Level Metadata File
+
+Create a new file:
+
+- `report-metadata.json`
+
+Purpose:
+
+- centralize report-card header metadata
+- avoid forcing the report generator to mine multiple test files for simple identity fields
+- allow temporary operator-provided or dummy values during the transition period
+
+## Recommended `report-metadata.json` Fields
+
+```json
+{
+  "schema_version": "1.0",
+  "run_id": "run-20260413-224139",
+  "test_timestamp": "2026-04-13T20:51:41Z",
+  "display_model": "12.3-nq1-lattice-ecp5",
+  "display_size": "12.3\"",
+  "display_resolution": "1920x720",
+  "display_serial_number": "DUMMY-SERIAL-NUMBER",
+  "fpga_sw_version": "v02",
+  "fpga_build_date": "2026-04-09",
+  "mcu_sw_version": "v01.04",
+  "tester_version": "display-test-framework 0.1.0",
+  "tester_git_revision": "unknown",
+  "operator": "",
+  "instrument_id": "",
+  "reference_gamut": "srgb",
+  "gamma_targets": [2.2, 2.4]
+}
+```
+
+Notes:
+
+- It is acceptable for some fields to start as placeholders.
+- The report generator will later replace placeholders automatically once the real values are available.
+
+## New Test 1: Display Serial Number Read
+
+### Purpose
+
+Populate the report card header with the real display serial number, read through the display I2C interface using `disptool`.
+
+### Recommended Test Name
+
+- `test-display-serial-read`
+
+### Expected Behavior
+
+- read serial number via `disptool`
+- store raw value and parsed serial
+- validate presence and basic format
+
+### Recommended JSON Shape
+
+```json
+{
+  "schema_version": "1.0",
+  "test_id": "test-display-serial-read-<timestamp>",
+  "test_info": {
+    "name": "test-display-serial-read",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read display serial number via I2C bridge"
+  },
+  "execution": {
+    "result": "PASS"
+  },
+  "data": {
+    "raw_bytes": "0x12 0x34 0x56 ...",
+    "serial_number": "SN123456789",
+    "source": "disptool"
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "serial_present",
+        "result": "PASS"
+      }
+    ]
+  },
+  "errors": []
+}
+```
+
+### Additional Requirement
+
+Copy the parsed serial into `report-metadata.json.display_serial_number` as a convenience field.
+
+## Existing Test Upgrade 1: Brightness Calibration
+
+### Current Problem
+
+`test-brightness-calibration.json` only contains summary metadata today. The 81-step curve is trapped in the log file.
+
+### Required Upgrade
+
+Save the full 81-step calibration data to a structured artifact.
+
+### Recommended Output Files
+
+- `artifacts/brightness-calibration-81step.json`
+- optional `artifacts/brightness-calibration-81step.csv`
+
+### Required Per-Sample Fields
+
+- sample index
+- brightness percent
+- luminance `Y`
+- chromaticity `x`
+- chromaticity `y`
+- optional `R`, `G`, `B` luminance channels if available
+- optional voltage/current/power fields if available
+- measurement timestamp
+
+### Recommended JSON Structure
+
+```json
+{
+  "schema_version": "1.0",
+  "display_model": "15.6-0od-lattice-ecp5",
+  "total_samples": 81,
+  "brightness_step_percent": 1.25,
+  "samples": [
+    {
+      "index": 1,
+      "brightness_percent": 0.0,
+      "Y_luminance": 0.0,
+      "x_chromaticity": 0.333333,
+      "y_chromaticity": 0.333333,
+      "timestamp": "2026-04-13T18:44:36Z"
+    }
+  ]
+}
+```
+
+### Required Change to Existing Test JSON
+
+Add artifact references into `raw/test-brightness-calibration.json.data`, for example:
+
+```json
+{
+  "calibration_json": "artifacts/brightness-calibration-81step.json",
+  "calibration_csv": "artifacts/brightness-calibration-81step.csv"
+}
+```
+
+Relative artifact paths are required so the run folder remains portable.
+
+## New Test 2: Gamma Curve / Grayscale Sweep
+
+### Purpose
+
+Measure grayscale response at fixed backlight so the report generator can plot:
+
+- gamma 2.2 reference
+- gamma 2.4 reference
+- measured gamma curve
+- fitted measured gamma value
+
+### Important Distinction
+
+This test is not the same as brightness calibration.
+
+- Brightness calibration measures backlight command to luminance response.
+- Gamma test measures image gray-code to luminance response at fixed backlight.
+
+### Recommended Test Name
+
+- Primary current name: `test-gamma-curve`
+- Accepted future compatibility alias: `test-gamma-grayscale`
+
+### Test Conditions
+
+- fixed backlight: 100 percent by default
+- grayscale full-screen patches
+- constant measurement setup
+- same meter/instrument as other optical tests
+
+### Recommended Gray Levels
+
+Use enough points to resolve the near-black response and the upper-curve fit. The current implementation uses 33 patches:
+
+- `0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 135, 143, 151, 159, 167, 175, 183, 191, 199, 207, 215, 223, 231, 239, 247, 255`
+
+An alternate 25-point list is also acceptable if runtime needs to be shorter:
+
+- `0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 248, 255`
+
+Either list is a good compromise between quality and test time. The exact list used must be written into the raw test JSON or artifact metadata.
+
+### Required Per-Sample Fields
+
+- gray code value `0-255`
+- normalized input `0.0-1.0`
+- measured luminance `Y`
+- chromaticity `x`
+- chromaticity `y`
+- optional `X` and `Z` tristimulus values
+- optional luminance standard deviation
+- sample count
+- measurement status
+- measurement timestamp
+
+### Recommended Raw Test JSON Shape
+
+```json
+{
+  "schema_version": "1.0",
+  "test_id": "test-gamma-curve-<timestamp>",
+  "test_info": {
+    "name": "test-gamma-curve",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Measure display gamma response via grayscale sweep at fixed backlight"
+  },
+  "execution": {
+    "result": "PASS"
+  },
+  "data": {
+    "gamma": 2.537,
+    "y_black_nits": 0.0,
+    "y_max_nits": 1102.4,
+    "contrast_ratio": 1000000,
+    "rms_residual_gamma": 0.095,
+    "rms_residual_srgb": 0.736,
+    "num_patches": 33,
+    "samples_per_patch": 3,
+    "backlight_percent": 100,
+    "gray_levels": [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 135, 143, 151, 159, 167, 175, 183, 191, 199, 207, 215, 223, 231, 239, 247, 255],
+    "gamma_targets": [2.2, 2.4],
+    "csv_path": "artifacts/gamma_curve_test-gamma-curve.csv",
+    "inverse_lut_csv": "artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv",
+    "progress_log": "artifacts/gamma_progress.log",
+    "artifact_json": "artifacts/gamma-grayscale.json"
+  },
+  "validation": {
+    "checks": []
+  },
+  "errors": []
+}
+```
+
+`artifact_json` is optional until the tester emits a standalone JSON sample artifact. `csv_path` should be present for the current CSV-based implementation.
+
+### Recommended JSON Artifact Shape
+
+```json
+{
+  "schema_version": "1.0",
+  "display_model": "15.6-0od-lattice-ecp5",
+  "backlight_percent": 100,
+  "y_black_nits": 0.0,
+  "y_max_nits": 1102.4,
+  "gamma": 2.537,
+  "rms_residual_gamma": 0.095,
+  "rms_residual_srgb": 0.736,
+  "samples": [
+    {
+      "gray_code": 0,
+      "normalized_input": 0.0,
+      "Y_luminance": 0.0,
+      "x_chromaticity": 0.333333,
+      "y_chromaticity": 0.333333,
+      "Y_std": 0.0,
+      "samples": 3,
+      "status": "OK",
+      "timestamp": "2026-04-13T18:58:00Z"
+    }
+  ]
+}
+```
+
+### Current CSV Artifact Shape
+
+The current implementation may emit the forward curve as CSV instead of JSON. This is acceptable and should remain stable enough for the report generator.
+
+Required columns:
+
+- `code`
+- `R`, `G`, `B`
+- `X_mean`, `Y_mean`, `Z_mean`
+- `x_mean`, `y_mean`
+- `Y_std`
+- `samples`
+- `attempts`
+- `status`
+
+Recommended comment metadata at the top of the CSV:
+
+- `sweep_type`
+- `independent_variable`
+- `measurement_condition`
+- `timestamp`
+- `backlight_percent`
+- `y_black_nits`
+- `y_max_nits`
+- `contrast_ratio`
+- `hdmi_range`
+- `num_patches`
+- `samples_per_patch`
+
+The optional inverse-LUT CSV should use:
+
+- `target_rel_lum`
+- `code`
+
+The inverse LUT is useful for diagnostics and future correction work, but it is not required for the single-sheet report card.
+
+### Validation Recommendation
+
+The test should primarily be a measurement/data-capture test in v1.
+
+Recommended behavior:
+
+- always save the raw gamma data if measurement started successfully
+- optionally compute a fitted gamma value
+- do not fail the whole test just because measured gamma is not close to 2.2 or 2.4
+
+This keeps the raw data available for report generation and avoids throwing away useful measurements.
+
+If validation fails or the test exits as `ERROR` after collecting samples, keep the CSV/JSON artifacts and include the partial sample count plus the error reason in the raw test JSON.
+
+## New Test 3: White Soak Stability
+
+### Purpose
+
+Measure thermal and optical stabilization during 1 to 2 hours of full-white, full-brightness operation.
+
+The report card should later use this data to show:
+
+- backlight temperature rise and stabilization
+- white luminance drift over time
+- white-point drift over time
+
+### Recommended Test Name
+
+- `test-white-soak-stability`
+
+### Default Conditions
+
+- full white pattern
+- backlight at 100 percent
+- default duration: 1 hour
+- configurable duration: up to 2 hours
+
+### Recommended Sample Cadence
+
+- every 30 seconds for the first 10 minutes
+- every 60 seconds after that
+
+This captures the fast warm-up region without making the file unnecessarily large.
+
+### Required Per-Sample Fields
+
+- elapsed seconds
+- absolute timestamp
+- pattern name
+- backlight percent
+- backlight temperature in degC
+- white luminance `Y`
+- white chromaticity `x`
+- white chromaticity `y`
+- optional voltage/current/power
+
+### Recommended JSON Shape
+
+```json
+{
+  "schema_version": "1.0",
+  "test_id": "test-white-soak-stability-<timestamp>",
+  "test_info": {
+    "name": "test-white-soak-stability",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Measure thermal and optical stability during sustained white operation"
+  },
+  "execution": {
+    "result": "PASS"
+  },
+  "data": {
+    "pattern": "white",
+    "backlight_percent": 100,
+    "duration_minutes": 60,
+    "artifact_json": "artifacts/white-soak-stability.json",
+    "artifact_csv": "artifacts/white-soak-stability.csv",
+    "sample_count": 70
+  },
+  "validation": {
+    "checks": []
+  },
+  "errors": []
+}
+```
+
+### Recommended Artifact Shape
+
+```json
+{
+  "schema_version": "1.0",
+  "display_model": "15.6-0od-lattice-ecp5",
+  "pattern": "white",
+  "backlight_percent": 100,
+  "duration_minutes": 60,
+  "samples": [
+    {
+      "elapsed_seconds": 0,
+      "timestamp": "2026-04-13T19:00:00Z",
+      "bltemp_degc": 27.8,
+      "Y_luminance": 1082.1,
+      "x_chromaticity": 0.3036,
+      "y_chromaticity": 0.3305
+    }
+  ]
+}
+```
+
+### Validation Recommendation
+
+Like the gamma test, this should primarily be a measurement/data-capture test.
+
+Recommended optional derived summary fields:
+
+- `initial_temperature_degc`
+- `peak_temperature_degc`
+- `final_temperature_degc`
+- `initial_luminance`
+- `final_luminance`
+- `luminance_drift_percent`
+- `max_white_point_delta_xy`
+
+These can be stored either in the main test JSON or the artifact JSON.
+
+## Optional Future Extension: Warm vs End-of-Soak Gamut
+
+Not required for the first extension pass, but worth considering later:
+
+- measure full gamut once near the start
+- measure full gamut once near the end of soak
+
+This would show whether the RGB triangle shifts after the display warms up, not only the white point.
+
+## Existing Metadata Reuse
+
+Some header fields already exist and should continue to be populated from current tests:
+
+- FPGA version from `test-version-read`
+- MCU version from `test-iocversion-read`
+- display size and resolution from `test-fpgaid-read`
+- backlight temperature from `test-bltemp-read`
+
+The extension work should avoid duplicating logic unnecessarily, but `report-metadata.json` should still be written as the run-level convenience file.
+
+## Tester Version Capture
+
+The report header needs `tester version`.
+
+Recommended sources:
+
+- framework semantic version
+- optional git revision
+- optional test script bundle revision
+
+This data should be written once into `report-metadata.json`, and optionally mirrored into `summary.json`.
+
+## Data Preservation Rules
+
+These rules are important for all new measurement tests:
+
+- Save structured artifacts even when validation fails.
+- Keep human-readable logs, but do not make them the only source of raw measurements.
+- Require relative artifact paths in JSON for files inside the run folder.
+- Include enough metadata in the artifact to be self-describing.
+
+## Schema Compatibility Rules
+
+All new `raw/test-*.json` files should remain compatible with the current framework style:
+
+- `schema_version`
+- `test_id`
+- `test_info`
+- `execution`
+- `environment`
+- `data`
+- `validation`
+- `errors`
+
+This keeps tooling uniform and lowers integration risk.
+
+## Pass / Fail Philosophy
+
+For measurement-heavy tests such as gamma and soak:
+
+- prioritize data capture first
+- then apply validation rules second
+
+This prevents a slightly out-of-spec panel from causing the most useful data to be lost.
+
+## Acceptance Criteria
+
+- The result folder contains real or placeholder header metadata required by the report card.
+- The display serial number is readable from the display and saved in structured JSON.
+- The 81-step calibration curve is available in structured form without log scraping.
+- The gamma curve / grayscale sweep is available in structured CSV or JSON form.
+- The white soak stability run is available in structured form.
+- All new files use stable relative paths so the report generator can locate them reliably.
+
+## Recommended Implementation Order
+
+1. Add `report-metadata.json` generation with placeholder-capable fields.
+2. Add `test-display-serial-read`.
+3. Upgrade `test-brightness-calibration` to emit full structured artifacts.
+4. Standardize `test-gamma-curve` artifact paths and optionally add the JSON sample artifact.
+5. Add `test-white-soak-stability`.
+6. Optionally add warm-vs-end-of-soak gamut capture later.
+
+## Suggestions For The Automation Side
+
+- Keep the gamma and soak tests configurable by CLI or environment variables so long-duration runs can be enabled only when needed.
+- Store exact measurement cadence and instrument settings in the artifact metadata.
+- If the serial number or metadata read fails, still emit a JSON result with a clear error and do not silently omit the file.
+- Prefer generating the machine-readable artifact first, then deriving the human log from the same data path rather than the other way around.

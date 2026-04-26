@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-contrast-sequential-20260426-090817",
+  "test_info": {
+    "name": "test-contrast-sequential",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Measure display contrast ratio at multiple brightness levels",
+    "file": "tests/02-validation/test-contrast-sequential.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T07:05:51Z",
+    "end_time": "2026-04-26T07:08:17Z",
+    "duration_ms": 146000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "brightness_levels": [12.5, 25, 50, 75, 100],
+    "settle_time": 3,
+    "min_contrast_spec": 1000,
+    "contrast_measurements": [{
+      "brightness": 12.5,
+      "white_luminance": 13.138479,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 1313.8,
+      "contrast_ratio_display": ">1313.8",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 25,
+      "white_luminance": 26.204712,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 2620.4,
+      "contrast_ratio_display": ">2620.4",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 50,
+      "white_luminance": 53.614928,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 5361.4,
+      "contrast_ratio_display": ">5361.4",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 75,
+      "white_luminance": 81.195232,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 8119.5,
+      "contrast_ratio_display": ">8119.5",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }, {
+      "brightness": 100,
+      "white_luminance": 109.070861,
+      "black_luminance": 0.000000,
+      "contrast_ratio": 10907.0,
+      "contrast_ratio_display": ">10907.0",
+      "below_detection_threshold": true,
+      "measurement_status": "PASS"
+    }]
+  },
+  "validation": {
+    "checks": [{
+      "name": "total_measurements",
+      "expected": "5 expected",
+      "actual": "5 measured",
+      "result": "PASS"
+    }, {
+      "name": "contrast_at_50%",
+      "expected": ">= 1000:1",
+      "actual": ">5361.4:1",
+      "result": "PASS"
+    }],
+    "passed": 2,
+    "failed": 0
+  },
+  "errors": []
+}

@@ -1,0 +1,3 @@
+[08:06:27] Reading initial display power state...
+[08:06:27] Initial state: ON
+[08:06:27] Display power write test skipped (IOC_DISPPOWER_WRITE_ENABLED=no)

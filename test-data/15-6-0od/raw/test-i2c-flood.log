@@ -1,0 +1,63 @@
+[08:06:31] I2C flood test parameters:
+[08:06:31]   Iterations: 100
+[08:06:31]   Delay: 0s between iterations
+[08:06:31]   Read commands: version fpgaid lightsensor
+[08:06:31]   Write test: enabled (brightness 1-800)
+[08:06:31]   Stop on failure: no
+[08:06:31] 
+[08:06:31] Starting I2C flood test...
+[08:06:31] 
+[08:06:31] Progress: 10/100 iterations completed
+[08:06:32] Progress: 20/100 iterations completed
+[08:06:32] Progress: 30/100 iterations completed
+[08:06:33] Progress: 40/100 iterations completed
+[08:06:33] Progress: 50/100 iterations completed
+[08:06:34] Progress: 60/100 iterations completed
+[08:06:34] Progress: 70/100 iterations completed
+[08:06:35] Progress: 80/100 iterations completed
+[08:06:35] Progress: 90/100 iterations completed
+[08:06:35] Progress: 100/100 iterations completed
+[08:06:36] 
+[08:06:36] I2C flood test complete!
+[08:06:36] 
+[08:06:36] =========================================
+[08:06:36]   Test Statistics
+[08:06:36] =========================================
+[08:06:36] Total iterations: 100
+[08:06:36] Total operations: 400
+[08:06:36] Failed operations: 1
+[08:06:36] First failure at iteration: 100
+[08:06:36] 
+[08:06:36] Command: version
+[08:06:36]   Total: 100
+[08:06:36]   Success: 100
+[08:06:36]   NACK errors: 0
+[08:06:36]   Corruption: 0
+[08:06:36]   Success rate: 100.0%
+[08:06:36]   Reference value: 
+[08:06:36] 
+[08:06:36] Command: fpgaid
+[08:06:36]   Total: 100
+[08:06:36]   Success: 100
+[08:06:36]   NACK errors: 0
+[08:06:36]   Corruption: 0
+[08:06:36]   Success rate: 100.0%
+[08:06:36]   Reference value: 
+[08:06:36] 
+[08:06:36] Command: lightsensor
+[08:06:36]   Total: 100
+[08:06:36]   Success: 100
+[08:06:36]   NACK errors: 0
+[08:06:36]   Invalid data: 0
+[08:06:36]   Success rate: 100.0%
+[08:06:36] 
+[08:06:36] Command: brightness write
+[08:06:36]   Total: 100
+[08:06:36]   Success: 99
+[08:06:36]   NACK errors: 1
+[08:06:36]   Success rate: 99.0%
+[08:06:36] 
+[08:06:36] =========================================
+[08:06:36] 
+[08:06:36] Overall success rate: 99.7% (399/400)
+[08:06:36] 

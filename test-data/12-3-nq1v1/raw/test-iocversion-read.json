@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-iocversion-read-20260426-085305",
+  "test_info": {
+    "name": "test-iocversion-read",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read and validate IOC firmware version and build date",
+    "file": "tests/00-unit/test-iocversion-read.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:53:04Z",
+    "end_time": "2026-04-26T06:53:05Z",
+    "duration_ms": 1000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "raw_bytes": "0x01 0x06 0x20 0x26 0x04 0x14 0x06 0x57",
+    "fw_version": "v01.06",
+    "build_date": "2026-04-14 06:57"
+  },
+  "validation": {
+    "checks": [{
+      "name": "disptool_exit_code",
+      "expected": "0",
+      "actual": "0",
+      "result": "PASS"
+    }, {
+      "name": "fw_version_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "build_date_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "fw_version_not_empty",
+      "expected": "non-empty",
+      "actual": "v01.06",
+      "result": "PASS"
+    }, {
+      "name": "build_date_not_empty",
+      "expected": "non-empty",
+      "actual": "2026-04-14 06:57",
+      "result": "PASS"
+    }, {
+      "name": "fw_version_format",
+      "expected": "vXX.XX",
+      "actual": "v01.06",
+      "result": "PASS"
+    }],
+    "passed": 6,
+    "failed": 0
+  },
+  "errors": []
+}

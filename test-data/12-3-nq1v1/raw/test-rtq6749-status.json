@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-rtq6749-status-20260426-085305",
+  "test_info": {
+    "name": "test-rtq6749-status",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read RTQ6749 LCD PMIC status via MCU bridge and validate register values",
+    "file": "tests/00-unit/test-rtq6749-status.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:53:05Z",
+    "end_time": "2026-04-26T06:53:05Z",
+    "duration_ms": 0,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "status": "OK",
+    "faults": "NONE",
+    "channels": "PAVDD=ON VGL=ON VGH=ON NAVDD=ON VCOM=ON RESET=ON",
+    "protections": "OTP=OFF UVP=OFF SCP=OFF",
+    "pavdd": "6.70V (0x22)",
+    "navdd": "-6.70V (0x22)",
+    "vgh": "10.00V (0x06)",
+    "vgl": "-10.00V (0x10)",
+    "vcom_c": "0.00V (0x64)",
+    "auto_refresh": "OFF (time=0.5s)",
+    "switching_freq": "600kHz",
+    "exit_code": 0
+  },
+  "validation": {
+    "checks": [{
+      "name": "rtq6749_comm_ok",
+      "expected": "exit 0 or 2",
+      "actual": "0",
+      "result": "PASS"
+    }, {
+      "name": "pavdd_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "navdd_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "vgh_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "vgl_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "vcom_c_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "channels_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "no_faults",
+      "expected": "NONE",
+      "actual": "NONE",
+      "result": "PASS"
+    }, {
+      "name": "sw_freq_present",
+      "expected": "non-empty",
+      "actual": "600kHz",
+      "result": "PASS"
+    }],
+    "passed": 9,
+    "failed": 0
+  },
+  "errors": []
+}

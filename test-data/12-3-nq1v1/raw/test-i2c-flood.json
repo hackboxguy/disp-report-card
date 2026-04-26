@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-i2c-flood-20260426-085311",
+  "test_info": {
+    "name": "test-i2c-flood",
+    "category": "integration",
+    "version": "1.0",
+    "description": "I2C bus stress test - flood FPGA with read/write requests",
+    "file": "tests/01-integration/test-i2c-flood.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:53:07Z",
+    "end_time": "2026-04-26T06:53:11Z",
+    "duration_ms": 4000,
+    "exit_code": 3,
+    "result": "ERROR",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "flood_iterations": 100,
+    "total_operations": 400,
+    "failed_operations": 2,
+    "first_failure_iteration": 93,
+    "version": {
+      "success": 99,
+      "nack": 1,
+      "corruption": 0,
+      "reference_value": ""
+    },
+    "fpgaid": {
+      "success": 100,
+      "nack": 0,
+      "corruption": 0,
+      "reference_value": ""
+    },
+    "lightsensor": {
+      "success": 100,
+      "nack": 0,
+      "invalid": 0
+    },
+    "brightness_write": {
+      "success": 99,
+      "nack": 1
+    }
+  },
+  "validation": {
+    "checks": [{
+      "name": "version_success_rate",
+      "expected": "100%",
+      "actual": "99.0%",
+      "result": "FAIL"
+    }, {
+      "name": "fpgaid_success_rate",
+      "expected": "100%",
+      "actual": "100.0%",
+      "result": "PASS"
+    }, {
+      "name": "lightsensor_success_rate",
+      "expected": "100%",
+      "actual": "100.0%",
+      "result": "PASS"
+    }, {
+      "name": "brightness_write_success_rate",
+      "expected": "100%",
+      "actual": "99.0%",
+      "result": "FAIL"
+    }],
+    "passed": 2,
+    "failed": 2
+  },
+  "errors": ["I2C flood test: FAIL (2/400 operations failed)"]
+}

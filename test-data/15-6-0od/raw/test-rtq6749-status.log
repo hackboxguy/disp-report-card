@@ -1,0 +1,12 @@
+[08:06:29] Reading RTQ6749 PMIC status...
+[08:06:29] Status: OK [OK]
+[08:06:29] Faults: NONE [OK]
+[08:06:29] Channels: PAVDD=ON VGL=ON VGH=ON NAVDD=ON VCOM=OFF RESET=ON [OK]
+[08:06:29] Protections: OTP=OFF UVP=OFF SCP=OFF
+[08:06:29] PAVDD: 6.30V (0x1a) [OK]
+[08:06:29] NAVDD: -6.30V (0x1a) [OK]
+[08:06:29] VGH: 11.50V (0x09) [OK]
+[08:06:29] VGL: -9.00V (0x0c) [OK]
+[08:06:29] VCOM_C: -0.98V (0x95) [OK]
+[08:06:29] Auto Refresh: OFF (time=0.5s)
+[08:06:29] Switching Freq: 2.2MHz

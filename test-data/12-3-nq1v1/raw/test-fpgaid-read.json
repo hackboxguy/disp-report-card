@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-fpgaid-read-20260426-085304",
+  "test_info": {
+    "name": "test-fpgaid-read",
+    "category": "unit",
+    "version": "1.0",
+    "description": "Read and validate FPGA ID register (display type, resolution, size)",
+    "file": "tests/00-unit/test-fpgaid-read.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T06:53:03Z",
+    "end_time": "2026-04-26T06:53:04Z",
+    "duration_ms": 1000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "raw_bytes": "0x00 0x01 0x31 0x23",
+    "disp_resolution": "1920x720",
+    "board_type": "lattice-ecp5",
+    "disp_size": "12.3\""
+  },
+  "validation": {
+    "checks": [{
+      "name": "disptool_exit_code",
+      "expected": "0",
+      "actual": "0",
+      "result": "PASS"
+    }, {
+      "name": "disp_resolution_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "board_type_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "disp_size_status_ok",
+      "expected": "OK",
+      "actual": "OK",
+      "result": "PASS"
+    }, {
+      "name": "disp_resolution_not_empty",
+      "expected": "non-empty",
+      "actual": "1920x720",
+      "result": "PASS"
+    }, {
+      "name": "board_type_not_empty",
+      "expected": "non-empty",
+      "actual": "lattice-ecp5",
+      "result": "PASS"
+    }, {
+      "name": "disp_size_not_empty",
+      "expected": "non-empty",
+      "actual": "12.3\"",
+      "result": "PASS"
+    }, {
+      "name": "disp_resolution_format",
+      "expected": "WxH format",
+      "actual": "1920x720",
+      "result": "PASS"
+    }, {
+      "name": "disp_size_format",
+      "expected": "XX.X\" format",
+      "actual": "12.3\"",
+      "result": "PASS"
+    }, {
+      "name": "resolution_matches_config",
+      "expected": "1920x720",
+      "actual": "1920x720",
+      "result": "PASS"
+    }, {
+      "name": "board_type_matches_config",
+      "expected": "lattice-ecp5",
+      "actual": "lattice-ecp5",
+      "result": "PASS"
+    }, {
+      "name": "size_matches_config",
+      "expected": "12.3\"",
+      "actual": "12.3\"",
+      "result": "PASS"
+    }],
+    "passed": 12,
+    "failed": 0
+  },
+  "errors": []
+}

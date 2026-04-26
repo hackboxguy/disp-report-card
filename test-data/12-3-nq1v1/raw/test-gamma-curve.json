@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-gamma-curve-20260426-092006",
+  "test_info": {
+    "name": "test-gamma-curve",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Measure display gamma response via grey-ramp sweep and validate against spec",
+    "file": "tests/02-validation/test-gamma-curve.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-26T07:08:18Z",
+    "end_time": "2026-04-26T07:20:06Z",
+    "duration_ms": 708000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "gamma": 2.186854778899406,
+    "y_black_nits": 0,
+    "y_max_nits": 1065.872957,
+    "contrast_ratio": 1000000,
+    "rms_residual_gamma": 0.0680107873689985,
+    "rms_residual_srgb": 0.3567887295987798,
+    "num_patches": 33,
+    "samples_per_patch": 3,
+    "backlight_percent": 100,
+    "csv_path": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_curve_test-gamma-curve.csv",
+    "progress_log": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_progress.log"
+  },
+  "validation": {
+    "checks": [{
+      "name": "gamma_in_range",
+      "expected": "1.8-2.6",
+      "actual": "2.186854778899406",
+      "result": "PASS"
+    }, {
+      "name": "contrast_ratio_ok",
+      "expected": ">=500",
+      "actual": "infinite (y_black unmeasurable)",
+      "result": "PASS"
+    }, {
+      "name": "black_level_ok",
+      "expected": "<=2",
+      "actual": "0",
+      "result": "PASS"
+    }, {
+      "name": "rms_residual_ok",
+      "expected": "<=0.15",
+      "actual": "0.0680107873689985",
+      "result": "PASS"
+    }],
+    "passed": 4,
+    "failed": 0
+  },
+  "errors": []
+}
