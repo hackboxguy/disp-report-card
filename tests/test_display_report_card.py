@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def loader_args() -> argparse.Namespace:
     return argparse.Namespace(
-        reference_gamut="srgb",
+        reference_gamut="ntsc",
         serial_number=None,
         tester_version=None,
     )
@@ -29,6 +29,10 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(len(run.gamma.code), 33)
         self.assertEqual(run.contrast.result, "PASS")
         self.assertEqual(len(run.contrast.brightness), 5)
+        self.assertEqual(run.gamut.reference_name, "NTSC 1953")
+        self.assertEqual(run.gamut.reference_white_name, "D65")
+        self.assertAlmostEqual(run.gamut.coverage_percent, 79.2037177619253)
+        self.assertFalse(run.gamut.white_within_tolerance)
 
     def test_loads_15_6_fixture_with_partial_contrast(self) -> None:
         run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
@@ -44,6 +48,9 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(run.contrast.result, "ERROR")
         self.assertEqual(len(run.contrast.brightness), 4)
         self.assertEqual(set(run.contrast.expected_levels) - set(run.contrast.brightness), {25.0})
+        self.assertAlmostEqual(run.gamut.coverage_percent, 97.14563621344901)
+        self.assertGreater(run.gamut.relative_area_percent, 100.0)
+        self.assertTrue(run.gamut.white_within_tolerance)
 
 
 if __name__ == "__main__":

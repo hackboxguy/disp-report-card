@@ -18,7 +18,7 @@ The first implementation is per-run only. Cross-run comparison is explicitly out
 
 - Multi-run comparison or trend-over-history reporting.
 - PDF, HTML, or web dashboard output.
-- Dependence on heavy scientific/reporting packages such as `pandas`, `shapely`, `colour`, `plotly`, or browser-based renderers.
+- Dependence on heavy scientific/reporting packages such as `pandas`, `shapely`, `colour`, `plotly`, or browser-based renderers for the default Raspberry Pi path. Optional host-PC rendering enhancements may use heavier packages when explicitly requested.
 - Rewriting or mutating the original result folder contents.
 
 ## Output
@@ -334,7 +334,7 @@ Purpose:
 
 Preferred reference:
 
-- `sRGB / Rec.709` by default
+- `NTSC 1953` primaries with `D65` white by default
 
 Configurable reference options:
 
@@ -346,17 +346,30 @@ Configurable reference options:
 
 Rendering strategy for lightweight execution:
 
-- Avoid heavy chromaticity diagram packages in v1.
+- Avoid heavy chromaticity diagram packages in the default `basic` mode.
 - Render a simplified `x/y` chromaticity plot with axes, measured RGB triangle, reference triangle, and white-point markers.
 - This is sufficient for the report card and much lighter than a full CIE spectral locus implementation.
+- Draw the D65 white reference and a default tolerance ellipse of `0.010`.
+
+Advanced rendering strategy:
+
+- Provide `--render advanced` for host-PC usage.
+- Advanced mode may use optional packages such as `colour-science` to render a CIE 1931 chromaticity background similar to `imagetools/scripts/analyze-2d-gamut.py`.
+- Do not require `pandas` or `shapely` for the default report-card path; CSV parsing and gamut triangle coverage can be handled by local lightweight code.
+- If optional advanced rendering dependencies are missing, warn and still produce a valid basic-style gamut panel.
 
 Annotated metrics:
 
+- reference gamut name
+- gamut coverage percentage, computed as measured/reference triangle overlap area divided by reference area
+- relative measured gamut area percentage
 - white luminance at 100%
 - measured white point `(x, y)`
 - reference white point `(x, y)`
 - `delta x`
 - `delta y`
+- white-point distance in tolerance units
+- whether the measured white point is inside the D65 tolerance ellipse
 
 ## Optional Future Footer Charts
 
@@ -436,7 +449,8 @@ python3 display-report-card.py \
 Recommended optional flags:
 
 - `--metadata report-metadata.json`
-- `--reference-gamut srgb`
+- `--reference-gamut ntsc`
+- `--render basic`
 - `--dpi 200`
 - `--title`
 - `--serial-number`
@@ -454,13 +468,18 @@ Preferred dependencies:
 
 `matplotlib` is acceptable for report-card rendering and is not considered a heavy dependency for this project. Use the Agg backend for headless Raspberry Pi execution.
 
-Avoid for v1:
+Avoid for the default `basic` mode:
 
 - `pandas`
 - `shapely`
 - `colour`
 - `seaborn`
 - HTML/CSS renderers
+
+Allowed only behind explicit host-PC rendering modes:
+
+- `colour` / `colour-science` for the optional CIE chromaticity background in `--render advanced`
+- other heavier scientific packages only when they provide a clear visual or validation benefit and are never required for Pi execution
 
 Pi 4 considerations:
 
@@ -550,7 +569,7 @@ The script should support three phases:
 
 ## Open Decisions
 
-- Final reference gamut default. Current recommendation: `sRGB / Rec.709`.
+- Reference gamut default is `NTSC 1953` primaries with `D65` white.
 - Exact placeholder strings for missing metadata.
 - Whether to show `errors` and `fails` as separate colors if future tests distinguish them more clearly.
 - Whether the footer should prefer stability plots or issue notes when both are available.

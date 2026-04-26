@@ -39,10 +39,15 @@ Options:
 
 - `--input` - required result folder.
 - `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
-- `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`.
+- `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`; default is `ntsc`.
+- `--render` - `basic` by default, or `advanced` for an optional CIE chromaticity background when `colour-science` is installed.
 - `--dpi` - output DPI, default `200`.
 - `--serial-number` - temporary header override.
 - `--tester-version` - temporary header override.
+
+The default gamut panel uses NTSC 1953 primaries with D65 white. It reports reference coverage,
+relative measured area, measured white-point offset, and distance against the default D65 tolerance
+ellipse of `0.010`.
 
 ## Verification
 
@@ -57,6 +62,11 @@ python3 src/display_report_card.py \
 python3 src/display_report_card.py \
   --input test-data/15-6-0od \
   --output out/15-6-report-card.png
+
+python3 src/display_report_card.py \
+  --input test-data/15-6-0od \
+  --output out/15-6-report-card-advanced.png \
+  --render advanced
 ```
 
 Expected output size at the default DPI is `2338 x 1654` pixels.
@@ -65,5 +75,7 @@ Expected output size at the default DPI is `2338 x 1654` pixels.
 
 - Use Python standard library plus `numpy` and `matplotlib`.
 - Use the `matplotlib` Agg backend for headless Raspberry Pi execution.
+- Keep `basic` rendering free of heavy scientific/reporting dependencies.
+- Treat `advanced` rendering dependencies as optional host-PC enhancements; missing optional modules should warn and still produce a report.
 - Treat input result folders as read-only.
 - Keep implementation commits scoped to the phases in `PLAN.md`.

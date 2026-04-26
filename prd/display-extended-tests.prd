@@ -85,7 +85,7 @@ Purpose:
   "tester_git_revision": "unknown",
   "operator": "",
   "instrument_id": "",
-  "reference_gamut": "srgb",
+  "reference_gamut": "ntsc",
   "gamma_targets": [2.2, 2.4]
 }
 ```

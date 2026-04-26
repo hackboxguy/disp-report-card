@@ -24,13 +24,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Ellipse, Rectangle
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 import numpy as np
 
 
 A4_LANDSCAPE_INCHES = (11.69, 8.27)
 DEFAULT_DPI = 200
+DEFAULT_WHITE_TOLERANCE = 0.010
 
 STATUS_COLORS = {
     "PASS": "#1B8A5A",
@@ -47,6 +48,7 @@ REFERENCE_GAMUTS = {
         "g": (0.300, 0.600),
         "b": (0.150, 0.060),
         "w": (0.3127, 0.3290),
+        "white_name": "D65",
     },
     "rec709": {
         "name": "sRGB / Rec.709",
@@ -54,6 +56,7 @@ REFERENCE_GAMUTS = {
         "g": (0.300, 0.600),
         "b": (0.150, 0.060),
         "w": (0.3127, 0.3290),
+        "white_name": "D65",
     },
     "dcip3": {
         "name": "DCI-P3 D65",
@@ -61,13 +64,15 @@ REFERENCE_GAMUTS = {
         "g": (0.265, 0.690),
         "b": (0.150, 0.060),
         "w": (0.3127, 0.3290),
+        "white_name": "D65",
     },
     "ntsc": {
         "name": "NTSC 1953",
         "r": (0.670, 0.330),
         "g": (0.210, 0.710),
         "b": (0.140, 0.080),
-        "w": (0.310, 0.316),
+        "w": (0.3127, 0.3290),
+        "white_name": "D65",
     },
     "rec2020": {
         "name": "Rec.2020",
@@ -75,6 +80,7 @@ REFERENCE_GAMUTS = {
         "g": (0.170, 0.797),
         "b": (0.131, 0.046),
         "w": (0.3127, 0.3290),
+        "white_name": "D65",
     },
 }
 
@@ -164,6 +170,17 @@ class GamutMetrics:
     white_point: tuple[float, float] | None
     reference_name: str
     reference_white: tuple[float, float]
+    reference_white_name: str
+    reference_points: dict[str, tuple[float, float]]
+    measured_area: float | None
+    reference_area: float | None
+    overlap_area: float | None
+    coverage_percent: float | None
+    relative_area_percent: float | None
+    white_delta: tuple[float, float] | None
+    white_tolerance: float
+    white_tolerance_distance: float | None
+    white_within_tolerance: bool | None
 
 
 @dataclass
@@ -674,11 +691,97 @@ def extract_contrast(tests: dict[str, RawTest]) -> ContrastCurve | None:
     )
 
 
+def polygon_area(points: list[tuple[float, float]]) -> float:
+    if len(points) < 3:
+        return 0.0
+    total = 0.0
+    for idx, point in enumerate(points):
+        next_point = points[(idx + 1) % len(points)]
+        total += point[0] * next_point[1] - next_point[0] * point[1]
+    return abs(total) * 0.5
+
+
+def signed_polygon_area(points: list[tuple[float, float]]) -> float:
+    if len(points) < 3:
+        return 0.0
+    total = 0.0
+    for idx, point in enumerate(points):
+        next_point = points[(idx + 1) % len(points)]
+        total += point[0] * next_point[1] - next_point[0] * point[1]
+    return total * 0.5
+
+
+def clip_polygon_to_convex(
+    subject: list[tuple[float, float]],
+    clip: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Sutherland-Hodgman polygon clipping for convex clip polygons."""
+    if len(subject) < 3 or len(clip) < 3:
+        return []
+
+    orientation = 1.0 if signed_polygon_area(clip) >= 0 else -1.0
+    output = subject[:]
+
+    def cross(a: tuple[float, float], b: tuple[float, float], p: tuple[float, float]) -> float:
+        return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+
+    def inside(p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> bool:
+        return orientation * cross(a, b, p) >= -1e-12
+
+    def intersection(
+        s: tuple[float, float],
+        e: tuple[float, float],
+        a: tuple[float, float],
+        b: tuple[float, float],
+    ) -> tuple[float, float]:
+        x1, y1 = s
+        x2, y2 = e
+        x3, y3 = a
+        x4, y4 = b
+        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-12:
+            return e
+        px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
+        py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
+        return (px, py)
+
+    for idx, a in enumerate(clip):
+        b = clip[(idx + 1) % len(clip)]
+        input_list = output
+        output = []
+        if not input_list:
+            break
+        s = input_list[-1]
+        for e in input_list:
+            if inside(e, a, b):
+                if not inside(s, a, b):
+                    output.append(intersection(s, e, a, b))
+                output.append(e)
+            elif inside(s, a, b):
+                output.append(intersection(s, e, a, b))
+            s = e
+    return output
+
+
+def white_tolerance_distance(
+    measured: tuple[float, float],
+    reference: tuple[float, float],
+    tolerance: float,
+) -> float | None:
+    if tolerance <= 0:
+        return None
+    dx = measured[0] - reference[0]
+    dy = measured[1] - reference[1]
+    minor_axis = tolerance
+    major_axis = tolerance * 1.2
+    return math.sqrt((dx / minor_axis) ** 2 + (dy / major_axis) ** 2)
+
+
 def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetrics | None:
     test = tests.get("test-color-gamut")
     if not test:
         return None
-    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["srgb"])
+    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["ntsc"])
     points: dict[str, tuple[float, float]] = {}
     white_luminance: float | None = None
     white_point: tuple[float, float] | None = None
@@ -696,6 +799,38 @@ def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetri
 
     if not points:
         return None
+    reference_points = {
+        "R": reference["r"],
+        "G": reference["g"],
+        "B": reference["b"],
+    }
+
+    measured_area: float | None = None
+    reference_area: float | None = None
+    overlap_area: float | None = None
+    coverage_percent: float | None = None
+    relative_area_percent: float | None = None
+    if all(color in points for color in ("R", "G", "B")):
+        measured_triangle = [points["R"], points["G"], points["B"]]
+        reference_triangle = [reference_points["R"], reference_points["G"], reference_points["B"]]
+        measured_area = polygon_area(measured_triangle)
+        reference_area = polygon_area(reference_triangle)
+        overlap = clip_polygon_to_convex(measured_triangle, reference_triangle)
+        overlap_area = polygon_area(overlap)
+        if reference_area > 0:
+            coverage_percent = overlap_area / reference_area * 100.0
+            relative_area_percent = measured_area / reference_area * 100.0
+
+    white_delta: tuple[float, float] | None = None
+    tolerance_distance: float | None = None
+    within_tolerance: bool | None = None
+    if white_point:
+        reference_white = reference["w"]
+        white_delta = (white_point[0] - reference_white[0], white_point[1] - reference_white[1])
+        tolerance_distance = white_tolerance_distance(white_point, reference_white, DEFAULT_WHITE_TOLERANCE)
+        if tolerance_distance is not None:
+            within_tolerance = tolerance_distance <= 1.0
+
     return GamutMetrics(
         source="test-color-gamut",
         points=points,
@@ -703,6 +838,17 @@ def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetri
         white_point=white_point,
         reference_name=str(reference["name"]),
         reference_white=reference["w"],
+        reference_white_name=str(reference.get("white_name", "white")),
+        reference_points=reference_points,
+        measured_area=measured_area,
+        reference_area=reference_area,
+        overlap_area=overlap_area,
+        coverage_percent=coverage_percent,
+        relative_area_percent=relative_area_percent,
+        white_delta=white_delta,
+        white_tolerance=DEFAULT_WHITE_TOLERANCE,
+        white_tolerance_distance=tolerance_distance,
+        white_within_tolerance=within_tolerance,
     )
 
 
@@ -737,7 +883,14 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
     )
 
 
-def render_report_card(run: RunData, output: Path, title: str, dpi: int, reference_gamut: str) -> None:
+def render_report_card(
+    run: RunData,
+    output: Path,
+    title: str,
+    dpi: int,
+    reference_gamut: str,
+    render_mode: str,
+) -> None:
     fig = plt.figure(figsize=A4_LANDSCAPE_INCHES, dpi=dpi, facecolor="white")
     grid = fig.add_gridspec(
         4,
@@ -768,7 +921,7 @@ def render_report_card(run: RunData, output: Path, title: str, dpi: int, referen
     render_brightness(ax_brightness, run.brightness)
     render_gamma(ax_gamma, run.gamma)
     render_contrast(ax_contrast, run.contrast)
-    render_gamut(ax_gamut, run.gamut, reference_gamut)
+    render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings)
     render_footer(ax_footer, run)
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -952,12 +1105,34 @@ def render_contrast(ax: plt.Axes, contrast: ContrastCurve | None) -> None:
         ax.text(0.02, 0.94, "; ".join(note_parts), transform=ax.transAxes, fontsize=6.1, color="#C9342F", va="top")
 
 
-def render_gamut(ax: plt.Axes, gamut: GamutMetrics | None, reference_gamut: str) -> None:
+def render_gamut(
+    ax: plt.Axes,
+    gamut: GamutMetrics | None,
+    reference_gamut: str,
+    render_mode: str,
+    warnings: list[str],
+) -> None:
     style_chart(ax, "Gamut / White Point")
-    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["srgb"])
+    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["ntsc"])
+    if render_mode == "advanced":
+        render_advanced_chromaticity_background(ax, warnings)
+
     ref_triangle = [reference["r"], reference["g"], reference["b"], reference["r"]]
     ax.plot([p[0] for p in ref_triangle], [p[1] for p in ref_triangle], "--", color="#8C96A3", linewidth=1.0, label=reference["name"])
-    ax.plot(reference["w"][0], reference["w"][1], "x", color="#5B6472", markersize=5, label="D65")
+    ax.plot(reference["w"][0], reference["w"][1], "x", color="#5B6472", markersize=5, label=reference.get("white_name", "white"))
+    ax.add_patch(
+        Ellipse(
+            xy=reference["w"],
+            width=DEFAULT_WHITE_TOLERANCE * 2,
+            height=DEFAULT_WHITE_TOLERANCE * 2.4,
+            angle=-10,
+            fill=False,
+            edgecolor="#697684",
+            linestyle=":",
+            linewidth=1.0,
+            label=f"D65 tol {DEFAULT_WHITE_TOLERANCE:.3f}",
+        )
+    )
 
     if gamut is None:
         placeholder(ax, "Gamut data not available")
@@ -968,16 +1143,42 @@ def render_gamut(ax: plt.Axes, gamut: GamutMetrics | None, reference_gamut: str)
         ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label="measured")
     if gamut.white_point:
         ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=4.5, label="white")
-        dx = gamut.white_point[0] - gamut.reference_white[0]
-        dy = gamut.white_point[1] - gamut.reference_white[1]
-        y_text = f"Y {gamut.white_luminance:.1f}" if gamut.white_luminance is not None else "Y N/A"
-        ax.text(0.02, 0.05, f"{y_text} | dx {dx:+.4f}, dy {dy:+.4f}", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
+        annotation_parts = []
+        if gamut.coverage_percent is not None:
+            annotation_parts.append(f"cov {gamut.coverage_percent:.1f}%")
+        if gamut.relative_area_percent is not None:
+            annotation_parts.append(f"area {gamut.relative_area_percent:.1f}%")
+        if gamut.white_delta is not None:
+            annotation_parts.append(f"dx {gamut.white_delta[0]:+.4f}")
+            annotation_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+        if gamut.white_tolerance_distance is not None:
+            annotation_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
+        ax.text(0.02, 0.05, " | ".join(annotation_parts), transform=ax.transAxes, fontsize=5.9, color="#4F5965")
 
     ax.set_xlabel("CIE x", fontsize=7)
     ax.set_ylabel("CIE y", fontsize=7)
     ax.set_xlim(0.0, 0.78)
     ax.set_ylim(0.0, 0.82)
     ax.legend(loc="upper right", fontsize=5.7, frameon=False)
+
+
+def render_advanced_chromaticity_background(ax: plt.Axes, warnings: list[str]) -> None:
+    try:
+        from colour.plotting import plot_chromaticity_diagram_CIE1931
+    except Exception as exc:
+        message = f"advanced gamut rendering unavailable: {exc}"
+        if message not in warnings:
+            warnings.append(message)
+        ax.text(0.02, 0.92, "advanced CIE background unavailable", transform=ax.transAxes, fontsize=5.7, color="#9A5B00")
+        return
+
+    try:
+        plot_chromaticity_diagram_CIE1931(axes=ax, show=False, title=False)
+    except Exception as exc:
+        message = f"advanced gamut rendering failed: {exc}"
+        if message not in warnings:
+            warnings.append(message)
+        ax.text(0.02, 0.92, "advanced CIE background failed", transform=ax.transAxes, fontsize=5.7, color="#9A5B00")
 
 
 def style_chart(ax: plt.Axes, title: str) -> None:
@@ -1002,7 +1203,7 @@ def render_footer(ax: plt.Axes, run: RunData) -> None:
     ax.text(0.012, 0.68, "Observations", fontsize=8.2, weight="bold", color="#2D3845", transform=ax.transAxes)
     ax.text(0.012, 0.28, "  |  ".join(observations), fontsize=7.2, color="#4D5966", transform=ax.transAxes)
     if run.warnings:
-        ax.text(0.988, 0.28, f"{len(run.warnings)} parser warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
+        ax.text(0.988, 0.28, f"{len(run.warnings)} warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
 
 
 def build_observations(run: RunData) -> list[str]:
@@ -1017,6 +1218,8 @@ def build_observations(run: RunData) -> list[str]:
         notes.append(f"{len(skipped)} skipped model/configuration-specific test(s)")
     if run.gamma and run.gamma.gamma is not None:
         notes.append(f"Gamma {run.gamma.gamma:.3f}")
+    if run.gamut and run.gamut.coverage_percent is not None:
+        notes.append(f"{run.gamut.reference_name} coverage {run.gamut.coverage_percent:.1f}%")
     if run.contrast and run.contrast.result != "PASS":
         notes.append("Contrast chart uses partial measurement data")
     if run.header.display_serial_number.startswith("DUMMY"):
@@ -1033,7 +1236,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a display test report card PNG.")
     parser.add_argument("--input", required=True, type=Path, help="Input display test result folder.")
     parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
-    parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="srgb")
+    parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="ntsc")
+    parser.add_argument("--render", choices=["basic", "advanced"], default="basic", help="Gamut rendering mode.")
     parser.add_argument("--dpi", type=int, default=DEFAULT_DPI)
     parser.add_argument("--title", default="Display Test Report Card")
     parser.add_argument("--serial-number", default=None, help="Override display serial number.")
@@ -1050,7 +1254,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output = args.output or default_output_path(run)
-    render_report_card(run, output, args.title, args.dpi, args.reference_gamut)
+    render_report_card(run, output, args.title, args.dpi, args.reference_gamut, args.render)
     for warning in run.warnings:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"wrote {output}")

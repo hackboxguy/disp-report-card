@@ -8,6 +8,9 @@
 - Done: implemented the initial report-card generator in `src/display_report_card.py`.
 - Done: added focused extraction tests in `tests/`.
 - Done: verified PNG generation for both bundled fixture runs.
+- Done: switched the default gamut panel to NTSC 1953 primaries with D65 white reference.
+- Done: added gamut coverage, relative area, D65 tolerance, and white-point distance indicators.
+- Done: added `--render basic|advanced`; `basic` stays lightweight and `advanced` uses optional host-PC chromaticity rendering when available.
 - Next: refine packaging, parser tests, and future artifact support as needed.
 
 ## Phase 1: Loader And Metadata
@@ -30,7 +33,7 @@
 - Add future-ready hook for structured 81-step brightness calibration artifacts.
 - Done: extract gamma curve from `test-gamma-curve.json` and the current CSV artifact.
 - Done: extract contrast measurements, including partial data from `ERROR` tests.
-- Done: extract gamut and white-point metrics.
+- Done: extract gamut and white-point metrics, including reference coverage and D65 tolerance distance.
 
 ## Phase 3: Report Rendering
 
@@ -42,7 +45,8 @@
   - brightness
   - gamma
   - contrast
-  - gamut / white point
+  - gamut / white point with NTSC reference, coverage, and D65 tolerance
+- Done: add optional advanced gamut rendering mode for host PCs.
 - Done: add footer observations when soak data is unavailable.
 
 ## Phase 4: Verification
@@ -55,8 +59,8 @@
 
 ## Phase 5: Packaging And Documentation
 
-- Document CLI usage in `README.md`.
-- Document Python dependencies.
+- Done: document CLI usage in `README.md`.
+- Done: document Python dependencies and optional advanced rendering behavior.
 - Done: add focused tests for fixture parsing and current gamma path fallback.
 - Keep commits scoped to one implementation milestone at a time.
 
@@ -64,5 +68,7 @@
 
 - `matplotlib` and `numpy` are acceptable dependencies for v1.
 - Reuse the parsing and fitting approach from `gamma-tools/visualize-gamma.py`, but render only a compact report-card gamma panel.
+- Reuse the useful gamut ideas from `imagetools/scripts/analyze-2d-gamut.py`, but keep CSV parsing and polygon coverage local for the default Pi-friendly path.
+- `--render advanced` may use optional host-PC packages such as `colour-science`; it must warn and fall back gracefully when they are not installed.
 - Do not parse logs except as an explicit backward-compatibility fallback for brightness calibration.
 - Do not mutate input run folders.
