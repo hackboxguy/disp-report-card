@@ -27,13 +27,39 @@ Both fixtures include the current gamma extension:
 - `artifacts/gamma_curve_test-gamma-curve.csv`
 - `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
 
-## Planned CLI
+## Usage
 
 ```bash
 python3 src/display_report_card.py \
   --input test-data/12-3-nq1v1 \
   --output out/run-20260426-085300-report-card.png
 ```
+
+Options:
+
+- `--input` - required result folder.
+- `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
+- `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`.
+- `--dpi` - output DPI, default `200`.
+- `--serial-number` - temporary header override.
+- `--tester-version` - temporary header override.
+
+## Verification
+
+```bash
+python3 -m py_compile src/display_report_card.py
+python3 -m unittest discover -s tests
+
+python3 src/display_report_card.py \
+  --input test-data/12-3-nq1v1 \
+  --output out/12-3-report-card.png
+
+python3 src/display_report_card.py \
+  --input test-data/15-6-0od \
+  --output out/15-6-report-card.png
+```
+
+Expected output size at the default DPI is `2338 x 1654` pixels.
 
 ## Development Notes
 

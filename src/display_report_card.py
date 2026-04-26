@@ -1,0 +1,1061 @@
+#!/usr/bin/env python3
+"""Generate a single-run display test report card PNG."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import math
+import os
+import sys
+import tempfile
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+os.environ.setdefault(
+    "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "disp-report-card-mpl")
+)
+Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
+import numpy as np
+
+
+A4_LANDSCAPE_INCHES = (11.69, 8.27)
+DEFAULT_DPI = 200
+
+STATUS_COLORS = {
+    "PASS": "#1B8A5A",
+    "SKIP": "#808A96",
+    "ERROR": "#C9342F",
+    "FAIL": "#D04A26",
+    "INFO": "#5B6472",
+}
+
+REFERENCE_GAMUTS = {
+    "srgb": {
+        "name": "sRGB / Rec.709",
+        "r": (0.640, 0.330),
+        "g": (0.300, 0.600),
+        "b": (0.150, 0.060),
+        "w": (0.3127, 0.3290),
+    },
+    "rec709": {
+        "name": "sRGB / Rec.709",
+        "r": (0.640, 0.330),
+        "g": (0.300, 0.600),
+        "b": (0.150, 0.060),
+        "w": (0.3127, 0.3290),
+    },
+    "dcip3": {
+        "name": "DCI-P3 D65",
+        "r": (0.680, 0.320),
+        "g": (0.265, 0.690),
+        "b": (0.150, 0.060),
+        "w": (0.3127, 0.3290),
+    },
+    "ntsc": {
+        "name": "NTSC 1953",
+        "r": (0.670, 0.330),
+        "g": (0.210, 0.710),
+        "b": (0.140, 0.080),
+        "w": (0.310, 0.316),
+    },
+    "rec2020": {
+        "name": "Rec.2020",
+        "r": (0.708, 0.292),
+        "g": (0.170, 0.797),
+        "b": (0.131, 0.046),
+        "w": (0.3127, 0.3290),
+    },
+}
+
+
+@dataclass
+class RawTest:
+    name: str
+    path: Path
+    data: dict[str, Any]
+
+    @property
+    def result(self) -> str:
+        return str(self.data.get("execution", {}).get("result", "UNKNOWN")).upper()
+
+    @property
+    def category(self) -> str:
+        return str(self.data.get("test_info", {}).get("category", "unknown"))
+
+
+@dataclass
+class HeaderMetadata:
+    run_id: str
+    timestamp: str
+    display_model: str
+    display_size: str
+    display_resolution: str
+    display_serial_number: str
+    fpga_sw_version: str
+    fpga_companion: str
+    mcu_sw_version: str
+    tester_version: str
+
+
+@dataclass
+class StatusRow:
+    name: str
+    category: str
+    result: str
+    note: str
+
+
+@dataclass
+class BrightnessCurve:
+    source: str
+    brightness_percent: list[float]
+    luminance: list[float]
+    expected_luminance: list[float] = field(default_factory=list)
+
+
+@dataclass
+class GammaCurve:
+    source: str
+    code: np.ndarray
+    normalized_input: np.ndarray
+    luminance: np.ndarray
+    normalized_luminance: np.ndarray
+    y_std: np.ndarray
+    x_chromaticity: np.ndarray
+    y_chromaticity: np.ndarray
+    gamma: float | None
+    rms_gamma: float | None
+    rms_srgb: float | None
+    y_black: float
+    y_max: float
+    endpoint_drift_percent: float | None
+    samples_per_patch: int | None
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ContrastCurve:
+    source: str
+    expected_levels: list[float]
+    brightness: list[float]
+    contrast_ratio: list[float]
+    contrast_display: list[str]
+    lower_bound: list[bool]
+    result: str
+    errors: list[str]
+
+
+@dataclass
+class GamutMetrics:
+    source: str
+    points: dict[str, tuple[float, float]]
+    white_luminance: float | None
+    white_point: tuple[float, float] | None
+    reference_name: str
+    reference_white: tuple[float, float]
+
+
+@dataclass
+class RunData:
+    run_dir: Path
+    summary: dict[str, Any]
+    tests: dict[str, RawTest]
+    header: HeaderMetadata
+    status_rows: list[StatusRow]
+    brightness: BrightnessCurve | None
+    gamma: GammaCurve | None
+    contrast: ContrastCurve | None
+    gamut: GamutMetrics | None
+    warnings: list[str]
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_nested(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+    cur: Any = data
+    for key in keys:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+def as_float(value: Any, default: float | None = None) -> float | None:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def as_int(value: Any, default: int | None = None) -> int | None:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def shorten(text: str, limit: int) -> str:
+    text = " ".join(str(text).split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "."
+
+
+def format_timestamp(value: str) -> str:
+    if not value or value == "TBD":
+        return "TBD"
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return value
+    return parsed.strftime("%Y-%m-%d %H:%M:%S %Z").strip()
+
+
+def derive_display_size(display_model: str) -> str:
+    if not display_model:
+        return "TBD"
+    token = display_model.split("-", 1)[0]
+    try:
+        float(token)
+    except ValueError:
+        return "TBD"
+    return f'{token}"'
+
+
+def discover_tests(run_dir: Path) -> dict[str, RawTest]:
+    raw_dir = run_dir / "raw"
+    tests: dict[str, RawTest] = {}
+    if not raw_dir.exists():
+        return tests
+
+    for path in sorted(raw_dir.glob("*.json")):
+        data = load_json(path)
+        name = str(get_nested(data, "test_info", "name", default=path.stem))
+        tests[name] = RawTest(name=name, path=path, data=data)
+    return tests
+
+
+def resolve_artifact_path(
+    run_dir: Path,
+    raw_test_path: Path | None,
+    recorded_path: str | None,
+    fallback_relative: str | None = None,
+) -> tuple[Path | None, list[str]]:
+    warnings: list[str] = []
+    candidates: list[Path] = []
+
+    if recorded_path:
+        recorded = Path(recorded_path)
+        if recorded.is_absolute():
+            candidates.append(recorded)
+            candidates.append(run_dir / "artifacts" / recorded.name)
+        else:
+            candidates.append(run_dir / recorded)
+            if raw_test_path is not None:
+                candidates.append(raw_test_path.parent / recorded)
+
+    if fallback_relative:
+        candidates.append(run_dir / fallback_relative)
+
+    seen: set[Path] = set()
+    unique_candidates: list[Path] = []
+    for candidate in candidates:
+        try:
+            key = candidate.resolve(strict=False)
+        except OSError:
+            key = candidate
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_candidates.append(candidate)
+
+    for candidate in unique_candidates:
+        if candidate.exists():
+            return candidate, warnings
+
+    if recorded_path or fallback_relative:
+        attempted = ", ".join(str(p) for p in unique_candidates)
+        warnings.append(f"artifact not found; tried: {attempted}")
+    return None, warnings
+
+
+def resolve_header_metadata(
+    run_dir: Path,
+    summary: dict[str, Any],
+    tests: dict[str, RawTest],
+    overrides: argparse.Namespace,
+) -> HeaderMetadata:
+    metadata_path = run_dir / "report-metadata.json"
+    metadata = load_json(metadata_path) if metadata_path.exists() else {}
+
+    fpgaid = tests.get("test-fpgaid-read")
+    version = tests.get("test-version-read")
+    iocversion = tests.get("test-iocversion-read")
+    serial = tests.get("test-display-serial-read")
+
+    fpga_display_model = get_nested(fpgaid.data, "environment", "display_model", default="") if fpgaid else ""
+    display_model = str(metadata.get("display_model") or summary.get("display_model") or fpga_display_model or "")
+    display_size = str(
+        metadata.get("display_size")
+        or (get_nested(fpgaid.data, "data", "disp_size") if fpgaid else None)
+        or derive_display_size(display_model)
+        or "TBD"
+    )
+    display_resolution = str(
+        metadata.get("display_resolution")
+        or (get_nested(fpgaid.data, "data", "disp_resolution") if fpgaid else None)
+        or "TBD"
+    )
+
+    display_serial_number = str(
+        overrides.serial_number
+        or metadata.get("display_serial_number")
+        or (get_nested(serial.data, "data", "serial_number") if serial else None)
+        or "DUMMY-SERIAL-NUMBER"
+    )
+
+    fpga_sw_version = str(
+        metadata.get("fpga_sw_version")
+        or (get_nested(version.data, "data", "version") if version else None)
+        or "DUMMY-FPGA-VERSION"
+    )
+    fpga_companion_parts = []
+    if version:
+        build_date = get_nested(version.data, "data", "date")
+        binary = get_nested(version.data, "data", "binary")
+        if build_date:
+            fpga_companion_parts.append(str(build_date))
+        if binary:
+            fpga_companion_parts.append(f"bin {binary}")
+    fpga_companion = " / ".join(fpga_companion_parts)
+
+    mcu_sw_version = str(
+        metadata.get("mcu_sw_version")
+        or (get_nested(iocversion.data, "data", "fw_version") if iocversion else None)
+        or "N/A"
+    )
+
+    tester_version = (
+        overrides.tester_version
+        or metadata.get("tester_version")
+        or summary.get("framework_version")
+        or resolve_framework_version(tests)
+        or "DUMMY-TESTER-VERSION"
+    )
+
+    return HeaderMetadata(
+        run_id=str(metadata.get("run_id") or summary.get("run_id") or run_dir.name),
+        timestamp=str(metadata.get("test_timestamp") or summary.get("timestamp") or "TBD"),
+        display_model=display_model or "TBD",
+        display_size=display_size,
+        display_resolution=display_resolution,
+        display_serial_number=display_serial_number,
+        fpga_sw_version=fpga_sw_version,
+        fpga_companion=fpga_companion,
+        mcu_sw_version=str(non_empty_value(mcu_sw_version)),
+        tester_version=str(non_empty_value(tester_version)),
+    )
+
+
+def non_empty_value(value: Any) -> str:
+    if value is None or value == "":
+        return "TBD"
+    return str(value)
+
+
+def resolve_framework_version(tests: dict[str, RawTest]) -> str | None:
+    versions = {
+        str(get_nested(test.data, "environment", "framework_version", default=""))
+        for test in tests.values()
+    }
+    versions.discard("")
+    if len(versions) == 1:
+        return f"display-test-framework {next(iter(versions))}"
+    if versions:
+        return "mixed framework versions"
+    return None
+
+
+def extract_status_rows(tests: dict[str, RawTest]) -> list[StatusRow]:
+    def sort_key(test: RawTest) -> tuple[int, str]:
+        category_order = {"unit": 0, "integration": 1, "validation": 2}
+        return (category_order.get(test.category, 9), test.name)
+
+    return [
+        StatusRow(
+            name=test.name,
+            category=test.category,
+            result=test.result,
+            note=build_status_note(test),
+        )
+        for test in sorted(tests.values(), key=sort_key)
+    ]
+
+
+def build_status_note(test: RawTest) -> str:
+    errors = test.data.get("errors") or []
+    data = test.data.get("data") or {}
+
+    if test.name == "test-i2c-flood":
+        total = as_int(data.get("total_operations"))
+        failed = as_int(data.get("failed_operations"))
+        if total is not None and failed is not None:
+            if failed > 0:
+                return f"{failed}/{total} failed"
+            return f"{total - failed}/{total} ops ok"
+
+    if test.name == "test-ioc-i2c-flood":
+        total = as_int(data.get("total_operations"))
+        failed = as_int(data.get("failed_operations"), 0)
+        if total is not None:
+            return f"{total - (failed or 0)}/{total} ops ok"
+
+    if test.name == "test-brightness-linearity":
+        passed = as_int(data.get("passed_points"))
+        total = as_int(data.get("total_points"))
+        if passed is not None and total is not None:
+            return f"{passed}/{total} points"
+
+    if test.name == "test-color-gamut":
+        successful = as_int(data.get("successful_colors"))
+        total = as_int(data.get("total_colors"))
+        if successful is not None and total is not None:
+            return f"{successful}/{total} colors"
+
+    if test.name == "test-contrast-sequential":
+        measurements = data.get("contrast_measurements") or []
+        expected = data.get("brightness_levels") or []
+        if expected:
+            return f"{len(measurements)}/{len(expected)} levels"
+
+    if test.name == "test-gamma-curve":
+        gamma = as_float(data.get("gamma"))
+        patches = as_int(data.get("num_patches"))
+        if gamma is not None and patches is not None:
+            return f"gamma {gamma:.3f}, {patches} patches"
+
+    if test.name == "test-fpgaid-read":
+        resolution = data.get("disp_resolution")
+        size = data.get("disp_size")
+        if resolution or size:
+            return " ".join(str(part) for part in (size, resolution) if part)
+
+    if test.name == "test-version-read":
+        version = data.get("version")
+        date = data.get("date")
+        if version:
+            return f"{version} {date or ''}".strip()
+
+    if test.name == "test-iocversion-read":
+        version = data.get("fw_version")
+        if version:
+            return str(version)
+
+    if errors:
+        return shorten(str(errors[0]), 46)
+
+    if test.result == "SKIP":
+        return "skipped"
+    return ""
+
+
+def extract_brightness(tests: dict[str, RawTest]) -> BrightnessCurve | None:
+    test = tests.get("test-brightness-linearity")
+    if not test:
+        return None
+
+    samples = get_nested(test.data, "data", "measured_data", default=[]) or []
+    brightness: list[float] = []
+    luminance: list[float] = []
+    expected: list[float] = []
+    for sample in samples:
+        x = as_float(sample.get("brightness_percent"))
+        y = as_float(sample.get("luminance"))
+        ey = as_float(sample.get("expected_luminance"))
+        if x is None or y is None:
+            continue
+        brightness.append(x)
+        luminance.append(y)
+        if ey is not None:
+            expected.append(ey)
+
+    if not brightness:
+        return None
+    return BrightnessCurve(
+        source="test-brightness-linearity",
+        brightness_percent=brightness,
+        luminance=luminance,
+        expected_luminance=expected if len(expected) == len(brightness) else [],
+    )
+
+
+def parse_gamma_csv(path: Path) -> tuple[dict[str, str], list[dict[str, str]]]:
+    metadata: dict[str, str] = {}
+    data_lines: list[str] = []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        for line in f:
+            if line.lstrip().startswith("#"):
+                parse_comment_metadata(line, metadata)
+            else:
+                data_lines.append(line)
+    reader = csv.DictReader(data_lines)
+    return metadata, [row for row in reader]
+
+
+def parse_comment_metadata(line: str, metadata: dict[str, str]) -> None:
+    body = line.lstrip("#").strip()
+    if not body:
+        return
+    for fragment in body.split(","):
+        part = fragment.strip()
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        metadata[key.strip()] = value.strip()
+
+
+def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve | None, list[str]]:
+    warnings: list[str] = []
+    test = tests.get("test-gamma-curve") or tests.get("test-gamma-grayscale")
+    if not test:
+        return None, warnings
+
+    recorded_csv = str(get_nested(test.data, "data", "csv_path", default="") or "")
+    artifact_path, path_warnings = resolve_artifact_path(
+        run_dir,
+        test.path,
+        recorded_csv,
+        "artifacts/gamma_curve_test-gamma-curve.csv",
+    )
+    warnings.extend(path_warnings)
+    if artifact_path is None:
+        return None, warnings
+
+    _metadata, rows = parse_gamma_csv(artifact_path)
+    code: list[float] = []
+    luminance: list[float] = []
+    y_std: list[float] = []
+    x_chrom: list[float] = []
+    y_chrom: list[float] = []
+    for row in rows:
+        if row.get("status", "").strip().upper() != "OK":
+            continue
+        c = as_float(row.get("code"))
+        y = as_float(row.get("Y_mean"))
+        if c is None or y is None:
+            continue
+        code.append(c)
+        luminance.append(y)
+        y_std.append(as_float(row.get("Y_std"), 0.0) or 0.0)
+        x_chrom.append(as_float(row.get("x_mean"), math.nan) or math.nan)
+        y_chrom.append(as_float(row.get("y_mean"), math.nan) or math.nan)
+
+    if len(code) < 3:
+        warnings.append(f"too few gamma rows in {artifact_path}")
+        return None, warnings
+
+    code_arr = np.asarray(code, dtype=float)
+    lum_arr = np.asarray(luminance, dtype=float)
+    y_std_arr = np.asarray(y_std, dtype=float)
+    x_arr = np.asarray(x_chrom, dtype=float)
+    y_arr = np.asarray(y_chrom, dtype=float)
+
+    y_black = as_float(get_nested(test.data, "data", "y_black_nits"), float(np.nanmin(lum_arr)))
+    y_max = as_float(get_nested(test.data, "data", "y_max_nits"), float(np.nanmax(lum_arr)))
+    if y_black is None:
+        y_black = float(np.nanmin(lum_arr))
+    if y_max is None:
+        y_max = float(np.nanmax(lum_arr))
+    denom = y_max - y_black
+    if denom <= 0:
+        warnings.append("gamma normalization denominator is not positive")
+        norm_lum = np.zeros_like(lum_arr)
+    else:
+        norm_lum = (lum_arr - y_black) / denom
+
+    norm_input = code_arr / 255.0
+    gamma = as_float(get_nested(test.data, "data", "gamma"))
+    if gamma is None:
+        gamma = fit_gamma(norm_input, norm_lum)
+
+    endpoint_drift = None
+    if denom > 0:
+        code_255_indexes = np.where(code_arr == 255)[0]
+        if len(code_255_indexes):
+            endpoint_drift = (norm_lum[code_255_indexes[-1]] - 1.0) * 100.0
+
+    return (
+        GammaCurve(
+            source=str(artifact_path.relative_to(run_dir) if artifact_path.is_relative_to(run_dir) else artifact_path),
+            code=code_arr,
+            normalized_input=norm_input,
+            luminance=lum_arr,
+            normalized_luminance=norm_lum,
+            y_std=y_std_arr,
+            x_chromaticity=x_arr,
+            y_chromaticity=y_arr,
+            gamma=gamma,
+            rms_gamma=as_float(get_nested(test.data, "data", "rms_residual_gamma")),
+            rms_srgb=as_float(get_nested(test.data, "data", "rms_residual_srgb")),
+            y_black=y_black,
+            y_max=y_max,
+            endpoint_drift_percent=endpoint_drift,
+            samples_per_patch=as_int(get_nested(test.data, "data", "samples_per_patch")),
+            warnings=warnings.copy(),
+        ),
+        warnings,
+    )
+
+
+def fit_gamma(normalized_input: np.ndarray, normalized_luminance: np.ndarray) -> float | None:
+    xs: list[float] = []
+    ys: list[float] = []
+    for x, y in zip(normalized_input, normalized_luminance):
+        if x <= 0 or y <= 0:
+            continue
+        xs.append(math.log(float(x)))
+        ys.append(math.log(float(y)))
+    if len(xs) < 3:
+        return None
+    slope, _intercept = np.polyfit(np.asarray(xs), np.asarray(ys), 1)
+    return float(slope)
+
+
+def extract_contrast(tests: dict[str, RawTest]) -> ContrastCurve | None:
+    test = tests.get("test-contrast-sequential")
+    if not test:
+        return None
+    data = test.data.get("data") or {}
+    measurements = data.get("contrast_measurements") or []
+    brightness: list[float] = []
+    ratios: list[float] = []
+    displays: list[str] = []
+    lower_bounds: list[bool] = []
+    for sample in measurements:
+        level = as_float(sample.get("brightness"))
+        ratio = as_float(sample.get("contrast_ratio"))
+        if level is None or ratio is None:
+            continue
+        brightness.append(level)
+        ratios.append(ratio)
+        displays.append(str(sample.get("contrast_ratio_display") or f"{ratio:.1f}"))
+        lower_bounds.append(bool(sample.get("below_detection_threshold")))
+    if not brightness:
+        return None
+    expected = [float(v) for v in data.get("brightness_levels", []) if as_float(v) is not None]
+    return ContrastCurve(
+        source="test-contrast-sequential",
+        expected_levels=expected,
+        brightness=brightness,
+        contrast_ratio=ratios,
+        contrast_display=displays,
+        lower_bound=lower_bounds,
+        result=test.result,
+        errors=[str(error) for error in (test.data.get("errors") or [])],
+    )
+
+
+def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetrics | None:
+    test = tests.get("test-color-gamut")
+    if not test:
+        return None
+    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["srgb"])
+    points: dict[str, tuple[float, float]] = {}
+    white_luminance: float | None = None
+    white_point: tuple[float, float] | None = None
+
+    for sample in get_nested(test.data, "data", "gamut_data", default=[]) or []:
+        color = str(sample.get("color", "")).upper()
+        x = as_float(sample.get("x_chromaticity"))
+        y = as_float(sample.get("y_chromaticity"))
+        if color and x is not None and y is not None:
+            points[color] = (x, y)
+        if color == "W":
+            white_luminance = as_float(sample.get("Y_luminance"))
+            if x is not None and y is not None:
+                white_point = (x, y)
+
+    if not points:
+        return None
+    return GamutMetrics(
+        source="test-color-gamut",
+        points=points,
+        white_luminance=white_luminance,
+        white_point=white_point,
+        reference_name=str(reference["name"]),
+        reference_white=reference["w"],
+    )
+
+
+def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
+    warnings: list[str] = []
+    run_dir = run_dir.resolve()
+    summary_path = run_dir / "summary.json"
+    if not summary_path.exists():
+        raise FileNotFoundError(f"missing required file: {summary_path}")
+
+    summary = load_json(summary_path)
+    tests = discover_tests(run_dir)
+    header = resolve_header_metadata(run_dir, summary, tests, args)
+    status_rows = extract_status_rows(tests)
+    brightness = extract_brightness(tests)
+    gamma, gamma_warnings = extract_gamma(run_dir, tests)
+    warnings.extend(gamma_warnings)
+    contrast = extract_contrast(tests)
+    gamut = extract_gamut(tests, args.reference_gamut)
+
+    return RunData(
+        run_dir=run_dir,
+        summary=summary,
+        tests=tests,
+        header=header,
+        status_rows=status_rows,
+        brightness=brightness,
+        gamma=gamma,
+        contrast=contrast,
+        gamut=gamut,
+        warnings=warnings,
+    )
+
+
+def render_report_card(run: RunData, output: Path, title: str, dpi: int, reference_gamut: str) -> None:
+    fig = plt.figure(figsize=A4_LANDSCAPE_INCHES, dpi=dpi, facecolor="white")
+    grid = fig.add_gridspec(
+        4,
+        2,
+        width_ratios=[1.08, 1.42],
+        height_ratios=[0.62, 0.52, 5.65, 0.55],
+        left=0.035,
+        right=0.985,
+        top=0.965,
+        bottom=0.045,
+        wspace=0.13,
+        hspace=0.24,
+    )
+
+    ax_header = fig.add_subplot(grid[0, :])
+    ax_kpi = fig.add_subplot(grid[1, :])
+    ax_matrix = fig.add_subplot(grid[2, 0])
+    chart_grid = grid[2, 1].subgridspec(2, 2, wspace=0.27, hspace=0.34)
+    ax_brightness = fig.add_subplot(chart_grid[0, 0])
+    ax_gamma = fig.add_subplot(chart_grid[0, 1])
+    ax_contrast = fig.add_subplot(chart_grid[1, 0])
+    ax_gamut = fig.add_subplot(chart_grid[1, 1])
+    ax_footer = fig.add_subplot(grid[3, :])
+
+    render_header(ax_header, run, title)
+    render_kpis(ax_kpi, run)
+    render_status_matrix(ax_matrix, run.status_rows)
+    render_brightness(ax_brightness, run.brightness)
+    render_gamma(ax_gamma, run.gamma)
+    render_contrast(ax_contrast, run.contrast)
+    render_gamut(ax_gamut, run.gamut, reference_gamut)
+    render_footer(ax_footer, run)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=dpi, facecolor="white")
+    plt.close(fig)
+
+
+def render_header(ax: plt.Axes, run: RunData, title: str) -> None:
+    ax.axis("off")
+    ax.add_patch(Rectangle((0, 0), 1, 1, transform=ax.transAxes, color="#F2F5F8", zorder=0))
+    header = run.header
+    ax.text(0.014, 0.66, title, fontsize=15.5, weight="bold", color="#17202A", transform=ax.transAxes)
+    ax.text(0.014, 0.24, header.run_id, fontsize=8.8, color="#44515F", transform=ax.transAxes)
+
+    row1 = [
+        ("Timestamp", format_timestamp(header.timestamp)),
+        ("Display", f"{header.display_size}  {header.display_resolution}"),
+        ("Model", header.display_model),
+    ]
+    row2 = [
+        ("Serial", header.display_serial_number),
+        ("FPGA", f"{header.fpga_sw_version} {header.fpga_companion}".strip()),
+        ("MCU", header.mcu_sw_version),
+        ("Tester", header.tester_version),
+    ]
+    for (label, value), x in zip(row1, [0.31, 0.49, 0.64]):
+        ax.text(x, 0.73, label, fontsize=6.4, color="#6B7682", transform=ax.transAxes)
+        ax.text(x, 0.52, shorten(value, 26), fontsize=8.0, color="#1C2733", transform=ax.transAxes)
+    for (label, value), x in zip(row2, [0.31, 0.49, 0.64, 0.76]):
+        if label == "Tester":
+            value = value.replace("display-test-framework", "framework")
+        ax.text(x, 0.31, label, fontsize=6.4, color="#6B7682", transform=ax.transAxes)
+        ax.text(x, 0.11, shorten(value, 24), fontsize=8.0, color="#1C2733", transform=ax.transAxes)
+
+
+def render_kpis(ax: plt.Axes, run: RunData) -> None:
+    ax.axis("off")
+    passed = as_int(run.summary.get("passed"), 0) or 0
+    failed = as_int(run.summary.get("failed"), 0) or 0
+    skipped = as_int(run.summary.get("skipped"), 0) or 0
+    errors = as_int(run.summary.get("errors"), 0) or 0
+    executed = passed + failed + errors
+    pass_rate = passed / executed * 100.0 if executed else 0.0
+    total = as_int(run.summary.get("total_tests"), len(run.status_rows)) or len(run.status_rows)
+    overall = "PASS" if failed == 0 and errors == 0 else "ATTENTION"
+    tiles = [
+        (f"Overall ({total} tests)", overall, "#1B8A5A" if overall == "PASS" else "#C9342F"),
+        ("Passed", str(passed), STATUS_COLORS["PASS"]),
+        ("Failed", str(failed), STATUS_COLORS["FAIL"]),
+        ("Errors", str(errors), STATUS_COLORS["ERROR"]),
+        ("Skipped", str(skipped), STATUS_COLORS["SKIP"]),
+        ("Executed Pass Rate", f"{pass_rate:.1f}%", "#245A92"),
+    ]
+    gap = 0.012
+    tile_w = (1.0 - gap * (len(tiles) - 1)) / len(tiles)
+    for idx, (label, value, color) in enumerate(tiles):
+        x = idx * (tile_w + gap)
+        ax.add_patch(
+            Rectangle((x, 0.06), tile_w, 0.88, transform=ax.transAxes, facecolor="#FFFFFF", edgecolor="#D9E0E7", linewidth=0.8)
+        )
+        ax.text(x + 0.02, 0.64, value, fontsize=14, weight="bold", color=color, transform=ax.transAxes)
+        ax.text(x + 0.02, 0.25, label, fontsize=7.5, color="#586472", transform=ax.transAxes)
+
+
+def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
+    ax.set_title("Test Matrix", loc="left", fontsize=10, weight="bold", pad=8)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    header_h = 0.052
+    row_h = (0.97 - header_h) / max(len(rows), 1)
+    columns = [
+        ("Test", 0.02, 0.47),
+        ("Category", 0.49, 0.17),
+        ("Result", 0.67, 0.13),
+        ("Note", 0.81, 0.17),
+    ]
+    ax.add_patch(Rectangle((0, 1 - header_h), 1, header_h, facecolor="#EDF2F6", edgecolor="#D3DCE5", linewidth=0.8))
+    for label, x, _width in columns:
+        ax.text(x, 1 - header_h / 2, label, va="center", fontsize=7.2, weight="bold", color="#3B4652")
+
+    for idx, row in enumerate(rows):
+        y_top = 1 - header_h - idx * row_h
+        y = y_top - row_h
+        bg = "#FFFFFF" if idx % 2 == 0 else "#F8FAFC"
+        ax.add_patch(Rectangle((0, y), 1, row_h, facecolor=bg, edgecolor="#E4E9EF", linewidth=0.45))
+        ax.text(0.02, y + row_h * 0.52, shorten(row.name.replace("test-", ""), 30), va="center", fontsize=6.45, color="#18222D")
+        ax.text(0.49, y + row_h * 0.52, row.category, va="center", fontsize=6.1, color="#5C6875")
+
+        color = STATUS_COLORS.get(row.result, "#5B6472")
+        ax.add_patch(Rectangle((0.67, y + row_h * 0.22), 0.105, row_h * 0.56, facecolor=color, edgecolor=color, linewidth=0))
+        ax.text(0.722, y + row_h * 0.51, row.result, ha="center", va="center", fontsize=5.6, color="white", weight="bold")
+        ax.text(0.81, y + row_h * 0.52, shorten(row.note, 22), va="center", fontsize=5.9, color="#47515D", clip_on=True)
+
+
+def render_brightness(ax: plt.Axes, brightness: BrightnessCurve | None) -> None:
+    style_chart(ax, "Brightness")
+    if brightness is None:
+        placeholder(ax, "Brightness data not available")
+        return
+    x = brightness.brightness_percent
+    y = brightness.luminance
+    ax.plot(x, y, "o-", color="#0072B2", linewidth=1.4, markersize=3.8, label="measured")
+    if brightness.expected_luminance:
+        ax.plot(x, brightness.expected_luminance, "--", color="#6B7682", linewidth=1.0, label="expected")
+    ax.set_xlabel("Brightness command (%)", fontsize=7)
+    ax.set_ylabel("Luminance Y (nits)", fontsize=7)
+    ax.set_xlim(-2, 102)
+    ax.set_ylim(bottom=0)
+    ax.legend(loc="upper left", fontsize=6, frameon=False)
+    if y:
+        ax.text(0.98, 0.05, f"Peak {max(y):.1f} nits", ha="right", transform=ax.transAxes, fontsize=6.5, color="#4F5965")
+
+
+def render_gamma(ax: plt.Axes, gamma: GammaCurve | None) -> None:
+    style_chart(ax, "Gamma")
+    if gamma is None:
+        placeholder(ax, "Gamma data not available")
+        return
+
+    ref_x = np.linspace(0, 1, 256)
+    ax.plot(ref_x, ref_x**2.2, "--", color="#999999", linewidth=1.0, label="ref 2.2")
+    ax.plot(ref_x, ref_x**2.4, ":", color="#666666", linewidth=1.0, label="ref 2.4")
+    if gamma.gamma is not None:
+        ax.plot(ref_x, ref_x**gamma.gamma, "-", color="#E69F00", linewidth=1.0, label=f"fit {gamma.gamma:.3f}")
+    ax.plot(
+        gamma.normalized_input,
+        gamma.normalized_luminance,
+        "o",
+        color="#0072B2",
+        markersize=3.5,
+        label="measured",
+        zorder=5,
+    )
+    ax.set_xlabel("Gray code / 255", fontsize=7)
+    ax.set_ylabel("Normalized luminance", fontsize=7)
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.03, 1.05)
+    ax.legend(loc="upper left", fontsize=5.8, frameon=False)
+
+    details = []
+    if gamma.rms_gamma is not None:
+        details.append(f"RMS {gamma.rms_gamma:.3f}")
+    details.append(f"Ymax {gamma.y_max:.1f}")
+    if gamma.endpoint_drift_percent is not None:
+        details.append(f"end {gamma.endpoint_drift_percent:+.1f}%")
+    ax.text(0.98, 0.05, " | ".join(details), ha="right", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
+
+
+def render_contrast(ax: plt.Axes, contrast: ContrastCurve | None) -> None:
+    style_chart(ax, "Contrast")
+    if contrast is None:
+        placeholder(ax, "Contrast data not available")
+        return
+    ax.plot(contrast.brightness, contrast.contrast_ratio, "o-", color="#009E73", linewidth=1.4, markersize=3.8)
+    ax.set_xlabel("Brightness command (%)", fontsize=7)
+    ax.set_ylabel("Contrast ratio", fontsize=7)
+    ax.set_xlim(0, 105)
+    ax.set_yscale("log")
+    ax.yaxis.set_major_locator(LogLocator(base=10, numticks=4))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:.0f}:1"))
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    for x, y, label, lower in zip(
+        contrast.brightness,
+        contrast.contrast_ratio,
+        contrast.contrast_display,
+        contrast.lower_bound,
+    ):
+        text = label if lower and label.startswith(">") else f"{y:.0f}"
+        ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 5), ha="center", fontsize=5.5)
+    missing = sorted(set(contrast.expected_levels) - set(contrast.brightness))
+    note_parts = []
+    if any(contrast.lower_bound):
+        note_parts.append("lower bounds")
+    if missing:
+        note_parts.append("missing " + ", ".join(f"{level:g}%" for level in missing))
+    if contrast.result != "PASS":
+        note_parts.append(contrast.result)
+    if note_parts:
+        ax.text(0.02, 0.94, "; ".join(note_parts), transform=ax.transAxes, fontsize=6.1, color="#C9342F", va="top")
+
+
+def render_gamut(ax: plt.Axes, gamut: GamutMetrics | None, reference_gamut: str) -> None:
+    style_chart(ax, "Gamut / White Point")
+    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["srgb"])
+    ref_triangle = [reference["r"], reference["g"], reference["b"], reference["r"]]
+    ax.plot([p[0] for p in ref_triangle], [p[1] for p in ref_triangle], "--", color="#8C96A3", linewidth=1.0, label=reference["name"])
+    ax.plot(reference["w"][0], reference["w"][1], "x", color="#5B6472", markersize=5, label="D65")
+
+    if gamut is None:
+        placeholder(ax, "Gamut data not available")
+        return
+
+    if all(color in gamut.points for color in ("R", "G", "B")):
+        measured = [gamut.points["R"], gamut.points["G"], gamut.points["B"], gamut.points["R"]]
+        ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label="measured")
+    if gamut.white_point:
+        ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=4.5, label="white")
+        dx = gamut.white_point[0] - gamut.reference_white[0]
+        dy = gamut.white_point[1] - gamut.reference_white[1]
+        y_text = f"Y {gamut.white_luminance:.1f}" if gamut.white_luminance is not None else "Y N/A"
+        ax.text(0.02, 0.05, f"{y_text} | dx {dx:+.4f}, dy {dy:+.4f}", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
+
+    ax.set_xlabel("CIE x", fontsize=7)
+    ax.set_ylabel("CIE y", fontsize=7)
+    ax.set_xlim(0.0, 0.78)
+    ax.set_ylim(0.0, 0.82)
+    ax.legend(loc="upper right", fontsize=5.7, frameon=False)
+
+
+def style_chart(ax: plt.Axes, title: str) -> None:
+    ax.set_title(title, loc="left", fontsize=9.4, weight="bold", pad=6)
+    ax.grid(True, linestyle=":", linewidth=0.55, color="#B9C2CC", alpha=0.9)
+    ax.tick_params(axis="both", labelsize=6.2, length=2.5)
+    for spine in ax.spines.values():
+        spine.set_color("#CAD2DA")
+        spine.set_linewidth(0.8)
+
+
+def placeholder(ax: plt.Axes, message: str) -> None:
+    ax.text(0.5, 0.5, message, ha="center", va="center", fontsize=8, color="#697684", transform=ax.transAxes)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def render_footer(ax: plt.Axes, run: RunData) -> None:
+    ax.axis("off")
+    ax.add_patch(Rectangle((0, 0), 1, 1, transform=ax.transAxes, facecolor="#F8FAFC", edgecolor="#D9E0E7", linewidth=0.8))
+    observations = build_observations(run)
+    ax.text(0.012, 0.68, "Observations", fontsize=8.2, weight="bold", color="#2D3845", transform=ax.transAxes)
+    ax.text(0.012, 0.28, "  |  ".join(observations), fontsize=7.2, color="#4D5966", transform=ax.transAxes)
+    if run.warnings:
+        ax.text(0.988, 0.28, f"{len(run.warnings)} parser warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
+
+
+def build_observations(run: RunData) -> list[str]:
+    notes: list[str] = []
+    failed_or_error = [row for row in run.status_rows if row.result in {"FAIL", "ERROR"}]
+    skipped = [row for row in run.status_rows if row.result == "SKIP"]
+    if failed_or_error:
+        notes.append("; ".join(f"{row.name}: {row.note or row.result}" for row in failed_or_error[:2]))
+    else:
+        notes.append("No FAIL or ERROR test results")
+    if skipped:
+        notes.append(f"{len(skipped)} skipped model/configuration-specific test(s)")
+    if run.gamma and run.gamma.gamma is not None:
+        notes.append(f"Gamma {run.gamma.gamma:.3f}")
+    if run.contrast and run.contrast.result != "PASS":
+        notes.append("Contrast chart uses partial measurement data")
+    if run.header.display_serial_number.startswith("DUMMY"):
+        notes.append("Display serial placeholder")
+    return [shorten(note, 78) for note in notes[:5]]
+
+
+def default_output_path(run: RunData) -> Path:
+    filename = f"{run.header.run_id}-report-card.png"
+    return Path(filename)
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate a display test report card PNG.")
+    parser.add_argument("--input", required=True, type=Path, help="Input display test result folder.")
+    parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
+    parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="srgb")
+    parser.add_argument("--dpi", type=int, default=DEFAULT_DPI)
+    parser.add_argument("--title", default="Display Test Report Card")
+    parser.add_argument("--serial-number", default=None, help="Override display serial number.")
+    parser.add_argument("--tester-version", default=None, help="Override tester version.")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    try:
+        run = load_run_folder(args.input, args)
+    except Exception as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    output = args.output or default_output_path(run)
+    render_report_card(run, output, args.title, args.dpi, args.reference_gamut)
+    for warning in run.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"wrote {output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
