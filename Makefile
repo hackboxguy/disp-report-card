@@ -13,6 +13,10 @@ report-samples:
 	$(PYTHON) $(REPORT) --input test-data/12-3-nq1v1 --output out/12-3-report-card.png
 	$(PYTHON) $(REPORT) --input test-data/15-6-0od --output out/15-6-report-card.png
 
+test-data/%: FORCE
+	mkdir -p out
+	$(PYTHON) $(REPORT) --input $@ --output out/$*-report-card.png
+
 report-samples-advanced:
 	mkdir -p out
 	$(PYTHON) $(REPORT) --input test-data/15-6-0od --output out/15-6-report-card-advanced.png --render advanced
@@ -23,3 +27,5 @@ clean:
 
 distclean: clean
 	rm -rf .venv
+
+FORCE:

@@ -68,10 +68,13 @@ ellipse of `0.010`.
 ```bash
 make test
 
+make test-data/12-3-nq1v1
 make report-samples
 make report-samples-advanced PYTHON=.venv/bin/python
 make clean
 ```
+
+The `test-data/<fixture>` make target writes `out/<fixture>-report-card.png`.
 
 Expected output size at the default DPI is `2338 x 1654` pixels.
 
