@@ -213,11 +213,11 @@ Purpose:
 
 Preferred data source:
 
-- Future structured 81-step artifact
+- Structured 81-step artifact referenced by `raw/test-brightness-calibration.json.data.calibration_json`
 
 Fallback:
 
-- If the 81-step artifact is missing, render the 9-point `brightness-linearity` data instead.
+- If the 81-step artifact is missing or invalid, render the 9-point `brightness-linearity` data instead.
 
 Plotted series:
 
@@ -410,9 +410,9 @@ Use structured JSON or CSV artifacts first. Parse logs only as backward-compatib
 
 ### Current Gap
 
-- The existing `test-brightness-calibration.json` contains only summary metadata.
-- The full 81-step calibration sweep is only present in the log today.
-- The generator should support temporary log parsing for this one test if needed, but the preferred long-term solution is a structured artifact.
+- Older `test-brightness-calibration.json` files contain only summary metadata.
+- Current extended tester runs may include `artifacts/brightness-calibration-81step.json` and optional CSV.
+- The generator should consume the structured artifact when present and should not parse brightness calibration logs.
 - The current gamma extension writes structured CSV and summary JSON, but not yet a standalone JSON sample artifact. The report generator should consume the CSV directly and should not parse gamma logs.
 
 ### Artifact Path Resolution

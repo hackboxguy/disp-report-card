@@ -27,6 +27,13 @@ Both fixtures include the current gamma extension:
 - `artifacts/gamma_curve_test-gamma-curve.csv`
 - `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
 
+When present, the report uses the structured 81-step brightness calibration artifact before falling
+back to the 9-point brightness-linearity data:
+
+- `raw/test-brightness-calibration.json`
+- `artifacts/brightness-calibration-81step.json`
+- `artifacts/brightness-calibration-81step.csv`
+
 ## Usage
 
 ```bash

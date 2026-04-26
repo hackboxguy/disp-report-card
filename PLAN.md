@@ -12,7 +12,8 @@
 - Done: added gamut coverage, relative area, D65 tolerance, and white-point distance indicators.
 - Done: added `--render basic|advanced`; `basic` stays lightweight and `advanced` uses optional host-PC chromaticity rendering when available.
 - Done: added packaging metadata, a console entry point, repeatable make targets, and edge-case parser tests.
-- Next: add future structured brightness/stability artifact support when those tester artifacts are available.
+- Done: consume the structured 81-step brightness calibration artifact when it is present.
+- Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata
 
@@ -30,8 +31,7 @@
 ## Phase 2: Structured Data Extraction
 
 - Done: extract test status rows for the matrix.
-- Done: extract brightness curve from `test-brightness-linearity.json`.
-- Add future-ready hook for structured 81-step brightness calibration artifacts.
+- Done: prefer structured 81-step brightness calibration artifacts and fall back to `test-brightness-linearity.json`.
 - Done: extract gamma curve from `test-gamma-curve.json` and the current CSV artifact.
 - Done: extract contrast measurements, including partial data from `ERROR` tests.
 - Done: extract gamut and white-point metrics, including reference coverage and D65 tolerance distance.

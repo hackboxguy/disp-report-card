@@ -128,6 +128,9 @@ class BrightnessCurve:
     brightness_percent: list[float]
     luminance: list[float]
     expected_luminance: list[float] = field(default_factory=list)
+    sample_count: int | None = None
+    complete: bool | None = None
+    from_cache: bool | None = None
 
 
 @dataclass
@@ -457,6 +460,17 @@ def build_status_note(test: RawTest) -> str:
         if passed is not None and total is not None:
             return f"{passed}/{total} points"
 
+    if test.name == "test-brightness-calibration":
+        collected = as_int(data.get("samples_collected"))
+        total = as_int(data.get("total_samples"))
+        if collected is not None and total is not None:
+            note = f"{collected}/{total} samples"
+            if data.get("from_cache") is True:
+                note += " cache"
+            return note
+        if total is not None:
+            return f"{total} samples"
+
     if test.name == "test-color-gamut":
         successful = as_int(data.get("successful_colors"))
         total = as_int(data.get("total_colors"))
@@ -500,7 +514,69 @@ def build_status_note(test: RawTest) -> str:
     return ""
 
 
-def extract_brightness(tests: dict[str, RawTest]) -> BrightnessCurve | None:
+def extract_brightness(run_dir: Path, tests: dict[str, RawTest]) -> tuple[BrightnessCurve | None, list[str]]:
+    warnings: list[str] = []
+    calibration = extract_brightness_calibration(run_dir, tests, warnings)
+    if calibration is not None:
+        return calibration, warnings
+    return extract_brightness_linearity(tests), warnings
+
+
+def extract_brightness_calibration(
+    run_dir: Path,
+    tests: dict[str, RawTest],
+    warnings: list[str],
+) -> BrightnessCurve | None:
+    test = tests.get("test-brightness-calibration")
+    if not test:
+        return None
+
+    recorded_json = str(get_nested(test.data, "data", "calibration_json", default="") or "")
+    artifact_path, path_warnings = resolve_artifact_path(
+        run_dir,
+        test.path,
+        recorded_json,
+        "artifacts/brightness-calibration-81step.json",
+    )
+    if recorded_json or artifact_path is not None:
+        warnings.extend(path_warnings)
+    if artifact_path is None:
+        return None
+
+    try:
+        artifact = load_json(artifact_path)
+    except (OSError, json.JSONDecodeError) as exc:
+        warnings.append(f"could not load brightness calibration artifact {artifact_path}: {exc}")
+        return None
+
+    samples = artifact.get("samples") or []
+    brightness: list[float] = []
+    luminance: list[float] = []
+    for sample in samples:
+        if not isinstance(sample, dict):
+            continue
+        x = as_float(sample.get("brightness_percent"))
+        y = as_float(sample.get("Y_luminance"))
+        if x is None or y is None:
+            continue
+        brightness.append(x)
+        luminance.append(y)
+
+    if not brightness:
+        warnings.append(f"no usable brightness calibration samples in {artifact_path}")
+        return None
+
+    return BrightnessCurve(
+        source=str(artifact_path.relative_to(run_dir) if artifact_path.is_relative_to(run_dir) else artifact_path),
+        brightness_percent=brightness,
+        luminance=luminance,
+        sample_count=len(brightness),
+        complete=bool(artifact.get("complete")) if "complete" in artifact else None,
+        from_cache=bool(artifact.get("from_cache")) if "from_cache" in artifact else None,
+    )
+
+
+def extract_brightness_linearity(tests: dict[str, RawTest]) -> BrightnessCurve | None:
     test = tests.get("test-brightness-linearity")
     if not test:
         return None
@@ -527,6 +603,7 @@ def extract_brightness(tests: dict[str, RawTest]) -> BrightnessCurve | None:
         brightness_percent=brightness,
         luminance=luminance,
         expected_luminance=expected if len(expected) == len(brightness) else [],
+        sample_count=len(brightness),
     )
 
 
@@ -868,7 +945,8 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
     tests = discover_tests(run_dir, warnings)
     header = resolve_header_metadata(run_dir, summary, tests, args)
     status_rows = extract_status_rows(tests)
-    brightness = extract_brightness(tests)
+    brightness, brightness_warnings = extract_brightness(run_dir, tests)
+    warnings.extend(brightness_warnings)
     gamma, gamma_warnings = extract_gamma(run_dir, tests)
     warnings.extend(gamma_warnings)
     contrast = extract_contrast(tests)
