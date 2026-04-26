@@ -71,6 +71,24 @@ python3 src/display_report_card.py \
 
 Expected output size at the default DPI is `2338 x 1654` pixels.
 
+### Advanced Rendering On Debian/Ubuntu Hosts
+
+Debian/Ubuntu may reject `pip install --user` with an externally managed environment error.
+Use a repo-local virtualenv instead:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install --no-deps 'colour-science==0.4.6'
+
+.venv/bin/python src/display_report_card.py \
+  --input test-data/15-6-0od \
+  --output out/15-6-report-card-advanced.png \
+  --render advanced
+```
+
+`python3-colour` is a different package and does not provide `colour.plotting`. Version
+`0.4.6` avoids pulling NumPy 2 into a virtualenv that reuses apt-built Matplotlib/Shapely.
+
 ## Development Notes
 
 - Use Python standard library plus `numpy` and `matplotlib`.

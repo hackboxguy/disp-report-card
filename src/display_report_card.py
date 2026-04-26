@@ -1143,17 +1143,29 @@ def render_gamut(
         ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label="measured")
     if gamut.white_point:
         ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=4.5, label="white")
-        annotation_parts = []
+        coverage_parts = []
+        white_parts = []
         if gamut.coverage_percent is not None:
-            annotation_parts.append(f"cov {gamut.coverage_percent:.1f}%")
+            coverage_parts.append(f"cov {gamut.coverage_percent:.1f}%")
         if gamut.relative_area_percent is not None:
-            annotation_parts.append(f"area {gamut.relative_area_percent:.1f}%")
+            coverage_parts.append(f"area {gamut.relative_area_percent:.1f}%")
         if gamut.white_delta is not None:
-            annotation_parts.append(f"dx {gamut.white_delta[0]:+.4f}")
-            annotation_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+            white_parts.append(f"dx {gamut.white_delta[0]:+.4f}")
+            white_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
         if gamut.white_tolerance_distance is not None:
-            annotation_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
-        ax.text(0.02, 0.05, " | ".join(annotation_parts), transform=ax.transAxes, fontsize=5.9, color="#4F5965")
+            white_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
+        annotation = "\n".join(" | ".join(parts) for parts in (coverage_parts, white_parts) if parts)
+        if annotation:
+            ax.text(
+                0.02,
+                0.055,
+                annotation,
+                transform=ax.transAxes,
+                fontsize=5.55,
+                color="#4F5965",
+                linespacing=1.15,
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2},
+            )
 
     ax.set_xlabel("CIE x", fontsize=7)
     ax.set_ylabel("CIE y", fontsize=7)
@@ -1164,6 +1176,8 @@ def render_gamut(
 
 def render_advanced_chromaticity_background(ax: plt.Axes, warnings: list[str]) -> None:
     try:
+        import warnings as warnings_module
+
         from colour.plotting import plot_chromaticity_diagram_CIE1931
     except Exception as exc:
         message = f"advanced gamut rendering unavailable: {exc}"
@@ -1173,7 +1187,20 @@ def render_advanced_chromaticity_background(ax: plt.Axes, warnings: list[str]) -
         return
 
     try:
-        plot_chromaticity_diagram_CIE1931(axes=ax, show=False, title=False)
+        with warnings_module.catch_warnings():
+            warnings_module.filterwarnings(
+                "ignore",
+                message="This figure includes Axes that are not compatible with tight_layout.*",
+                category=UserWarning,
+            )
+            plot_chromaticity_diagram_CIE1931(
+                axes=ax,
+                show=False,
+                title=False,
+                diagram_opacity=0.62,
+                spectral_locus_opacity=0.55,
+                spectral_locus_labels=[],
+            )
     except Exception as exc:
         message = f"advanced gamut rendering failed: {exc}"
         if message not in warnings:
