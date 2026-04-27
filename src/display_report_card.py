@@ -1502,6 +1502,8 @@ def render_gamut(
     ax.set_ylabel("CIE y", fontsize=7)
     ax.set_xlim(0.0, 0.78)
     ax.set_ylim(0.0, 0.82)
+    if render_mode == "advanced":
+        ax.set_aspect("auto", adjustable="box")
     ax.legend(loc="upper right", fontsize=5.7, frameon=False)
 
 
