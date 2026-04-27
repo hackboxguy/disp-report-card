@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-brightness-calibration-20260427-111117",
+  "test_id": "test-brightness-calibration-20260427-141031",
   "test_info": {
     "name": "test-brightness-calibration",
     "category": "validation",
@@ -9,9 +9,9 @@
     "file": "tests/02-validation/test-brightness-calibration.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:01:40Z",
-    "end_time": "2026-04-27T09:11:17Z",
-    "duration_ms": 577000,
+    "start_time": "2026-04-27T12:00:53Z",
+    "end_time": "2026-04-27T12:10:31Z",
+    "duration_ms": 578000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0

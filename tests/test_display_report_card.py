@@ -22,24 +22,37 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
     def test_loads_12_3_fixture(self) -> None:
         run = load_run_folder(REPO_ROOT / "test-data" / "12-3-nq1v1", loader_args())
 
-        self.assertEqual(run.header.run_id, "run-20260427-110120")
+        self.assertEqual(run.header.run_id, "run-20260427-140033")
         self.assertEqual(run.header.display_size, '12.3"')
         self.assertEqual(run.header.display_resolution, "1920x720")
-        self.assertEqual(len(run.status_rows), 21)
+        self.assertEqual(len(run.status_rows), 22)
         self.assertEqual(run.brightness.source, "artifacts/brightness-calibration-81step.json")
         self.assertEqual(len(run.brightness.brightness_percent), 81)
         self.assertEqual(run.brightness.sample_count, 81)
         self.assertTrue(run.brightness.complete)
         self.assertFalse(run.brightness.from_cache)
         self.assertIsNotNone(run.gamma)
-        self.assertAlmostEqual(run.gamma.gamma, 2.183730190299274)
+        self.assertAlmostEqual(run.gamma.gamma, 2.1824458280662506)
         self.assertEqual(len(run.gamma.code), 33)
         self.assertEqual(run.contrast.result, "PASS")
         self.assertEqual(len(run.contrast.brightness), 5)
         self.assertEqual(run.gamut.reference_name, "NTSC 1953")
         self.assertEqual(run.gamut.reference_white_name, "D65")
-        self.assertAlmostEqual(run.gamut.coverage_percent, 78.99485491040967)
+        self.assertAlmostEqual(run.gamut.coverage_percent, 78.85033441772023)
         self.assertFalse(run.gamut.white_within_tolerance)
+        self.assertIsNotNone(run.local_dimming_apl)
+        self.assertEqual(run.local_dimming_apl.source, "artifacts/local-dimming-apl-sweep.json")
+        self.assertTrue(run.local_dimming_apl.complete)
+        self.assertEqual(run.local_dimming_apl.samples_attempted, 14)
+        self.assertEqual(run.local_dimming_apl.samples_collected, 10)
+        self.assertEqual(run.local_dimming_apl.samples_skipped, 4)
+        measured = [sample for sample in run.local_dimming_apl.samples if sample.fits_screen]
+        skipped = [sample.apl_percent for sample in run.local_dimming_apl.samples if not sample.fits_screen]
+        peak = max(measured, key=lambda sample: sample.luminance or 0)
+        self.assertEqual(len(measured), 10)
+        self.assertEqual(skipped, [1.0, 40.0, 45.0, 50.0])
+        self.assertEqual(peak.apl_percent, 35.0)
+        self.assertAlmostEqual(peak.luminance, 871.972473)
 
     def test_loads_15_6_fixture_with_partial_contrast(self) -> None:
         run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
@@ -223,6 +236,60 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(run.brightness.expected_luminance, [0.0, 900.0])
         self.assertTrue(any("artifact not found" in warning for warning in run.warnings))
 
+    def test_local_dimming_apl_artifact_preserves_skipped_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            artifact_dir = run_dir / "artifacts"
+            raw_dir.mkdir()
+            artifact_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "local-dimming-apl"})
+            write_json(
+                raw_dir / "test-local-dimming-apl.json",
+                {
+                    "test_info": {"name": "test-local-dimming-apl", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {
+                        "apl_json": "artifacts/local-dimming-apl-sweep.json",
+                        "samples_attempted": 3,
+                        "samples_collected": 2,
+                        "samples_skipped": 1,
+                    },
+                },
+            )
+            write_json(
+                artifact_dir / "local-dimming-apl-sweep.json",
+                {
+                    "schema_version": "1.0",
+                    "display_model": "fixture-display",
+                    "test_id": "test-local-dimming-apl",
+                    "run_id": "local-dimming-apl",
+                    "complete": True,
+                    "artifact_generated_timestamp": "2026-04-27T12:29:28Z",
+                    "backlight_percent": 100,
+                    "samples_attempted": 3,
+                    "samples_collected": 2,
+                    "samples_skipped": 1,
+                    "samples": [
+                        apl_sample(1, 1.0, None, False, "box side 10mm smaller than i1 sensor minimum 25mm"),
+                        apl_sample(2, 2.0, 100.0, True, ""),
+                        apl_sample(3, 5.0, 250.0, True, ""),
+                    ],
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        self.assertEqual(run.local_dimming_apl.source, "artifacts/local-dimming-apl-sweep.json")
+        self.assertEqual(run.local_dimming_apl.samples_attempted, 3)
+        self.assertEqual(run.local_dimming_apl.samples_collected, 2)
+        self.assertEqual(run.local_dimming_apl.samples_skipped, 1)
+        self.assertEqual([sample.apl_percent for sample in run.local_dimming_apl.samples], [1.0, 2.0, 5.0])
+        self.assertEqual([sample.luminance for sample in run.local_dimming_apl.samples], [None, 100.0, 250.0])
+        self.assertFalse(run.local_dimming_apl.samples[0].fits_screen)
+        apl_row = next(row for row in run.status_rows if row.name == "test-local-dimming-apl")
+        self.assertEqual(apl_row.note, "2/3 APL, 1 skip")
+
     def test_malformed_optional_raw_json_is_skipped_with_warning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             run_dir = Path(temp_dir)
@@ -258,6 +325,20 @@ def brightness_sample(index: int, brightness_percent: float, luminance: float) -
         "x_chromaticity": 0.3127,
         "y_chromaticity": 0.3290,
         "timestamp": "2026-04-26T13:20:00Z",
+    }
+
+
+def apl_sample(index: int, apl_percent: float, luminance: float | None, fits_screen: bool, skip_reason: str) -> dict:
+    return {
+        "index": index,
+        "apl_percent": apl_percent,
+        "box_side_mm": 30.0,
+        "fits_screen": fits_screen,
+        "Y_luminance": luminance,
+        "x_chromaticity": 0.3127 if fits_screen else None,
+        "y_chromaticity": 0.3290 if fits_screen else None,
+        "skip_reason": skip_reason or None,
+        "timestamp": "2026-04-27T12:29:28Z",
     }
 
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-tpreset-readwrite-20260427-110124",
+  "test_id": "test-tpreset-readwrite-20260427-140037",
   "test_info": {
     "name": "test-tpreset-readwrite",
     "category": "unit",
@@ -9,8 +9,8 @@
     "file": "tests/00-unit/test-tpreset-readwrite.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:01:24Z",
-    "end_time": "2026-04-27T09:01:24Z",
+    "start_time": "2026-04-27T12:00:37Z",
+    "end_time": "2026-04-27T12:00:37Z",
     "duration_ms": 0,
     "exit_code": 2,
     "result": "SKIP",

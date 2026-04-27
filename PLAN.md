@@ -14,6 +14,7 @@
 - Done: added `--render basic|advanced`; `basic` stays lightweight and `advanced` uses optional host-PC chromaticity rendering when available.
 - Done: added packaging metadata, a console entry point, repeatable make targets, and edge-case parser tests.
 - Done: consume the structured 81-step brightness calibration artifact when it is present.
+- Done: consume and render the local-dimming APL sweep artifact when it is present.
 - Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata
@@ -36,6 +37,7 @@
 - Done: extract gamma curve from `test-gamma-curve.json` and the current CSV artifact.
 - Done: extract contrast measurements, including partial data from `ERROR` tests.
 - Done: extract gamut and white-point metrics, including reference coverage and D65 tolerance distance.
+- Done: extract local-dimming APL sweep metrics, including skipped APL steps.
 
 ## Phase 3: Report Rendering
 
@@ -43,11 +45,12 @@
 - Done: add header band with display and software identity fields.
 - Done: add summary KPI band with executed pass rate.
 - Done: add full test matrix.
-- Done: add four chart panels:
+- Done: add chart panels:
   - brightness
   - gamma
   - contrast
   - gamut / white point with NTSC reference, coverage, and D65 tolerance
+- Done: add local-dimming APL as a fifth chart panel spanning the bottom of the chart area.
 - Done: add optional advanced gamut rendering mode for host PCs.
 - Done: add footer observations when soak data is unavailable.
 

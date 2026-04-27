@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-pattern-bist-20260427-112816",
+  "test_id": "test-pattern-bist-20260427-142930",
   "test_info": {
     "name": "test-pattern-bist",
     "category": "validation",
@@ -9,8 +9,8 @@
     "file": "tests/02-validation/test-pattern-bist.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:28:16Z",
-    "end_time": "2026-04-27T09:28:16Z",
+    "start_time": "2026-04-27T12:29:30Z",
+    "end_time": "2026-04-27T12:29:30Z",
     "duration_ms": 0,
     "exit_code": 2,
     "result": "SKIP",

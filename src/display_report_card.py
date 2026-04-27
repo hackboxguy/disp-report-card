@@ -187,6 +187,32 @@ class GamutMetrics:
 
 
 @dataclass
+class LocalDimmingAplSample:
+    index: int
+    apl_percent: float
+    box_side_mm: float | None
+    fits_screen: bool
+    luminance: float | None
+    x_chromaticity: float | None
+    y_chromaticity: float | None
+    skip_reason: str
+    timestamp: str
+
+
+@dataclass
+class LocalDimmingAplCurve:
+    source: str
+    display_model: str
+    complete: bool | None
+    artifact_generated_timestamp: str
+    backlight_percent: float | None
+    samples_attempted: int | None
+    samples_collected: int | None
+    samples_skipped: int | None
+    samples: list[LocalDimmingAplSample]
+
+
+@dataclass
 class RunData:
     run_dir: Path
     summary: dict[str, Any]
@@ -197,6 +223,7 @@ class RunData:
     gamma: GammaCurve | None
     contrast: ContrastCurve | None
     gamut: GamutMetrics | None
+    local_dimming_apl: LocalDimmingAplCurve | None
     warnings: list[str]
 
 
@@ -489,6 +516,16 @@ def build_status_note(test: RawTest) -> str:
         if gamma is not None and patches is not None:
             return f"gamma {gamma:.3f}, {patches} patches"
 
+    if test.name == "test-local-dimming-apl":
+        collected = as_int(data.get("samples_collected"))
+        attempted = as_int(data.get("samples_attempted"))
+        skipped = as_int(data.get("samples_skipped"), 0) or 0
+        if collected is not None and attempted is not None:
+            note = f"{collected}/{attempted} APL"
+            if skipped:
+                note += f", {skipped} skip"
+            return note
+
     if test.name == "test-fpgaid-read":
         resolution = data.get("disp_resolution")
         size = data.get("disp_size")
@@ -773,6 +810,79 @@ def extract_contrast(tests: dict[str, RawTest]) -> ContrastCurve | None:
     )
 
 
+def extract_local_dimming_apl(
+    run_dir: Path,
+    tests: dict[str, RawTest],
+) -> tuple[LocalDimmingAplCurve | None, list[str]]:
+    warnings: list[str] = []
+    test = tests.get("test-local-dimming-apl")
+    if not test:
+        return None, warnings
+
+    recorded_json = str(get_nested(test.data, "data", "apl_json", default="") or "")
+    artifact_path, path_warnings = resolve_artifact_path(
+        run_dir,
+        test.path,
+        recorded_json,
+        "artifacts/local-dimming-apl-sweep.json",
+    )
+    warnings.extend(path_warnings)
+    if artifact_path is None:
+        return None, warnings
+
+    try:
+        artifact = load_json(artifact_path)
+    except (OSError, json.JSONDecodeError) as exc:
+        warnings.append(f"could not load local dimming APL artifact {artifact_path}: {exc}")
+        return None, warnings
+
+    schema_version = str(artifact.get("schema_version") or "")
+    if schema_version and schema_version != "1.0":
+        warnings.append(f"unsupported local dimming APL schema {schema_version}; attempting best effort parse")
+
+    samples: list[LocalDimmingAplSample] = []
+    for idx, sample in enumerate(artifact.get("samples") or [], start=1):
+        if not isinstance(sample, dict):
+            continue
+        apl = as_float(sample.get("apl_percent"))
+        if apl is None:
+            continue
+        luminance = as_float(sample.get("Y_luminance"))
+        fits_screen = bool(sample.get("fits_screen")) and luminance is not None
+        samples.append(
+            LocalDimmingAplSample(
+                index=as_int(sample.get("index"), idx) or idx,
+                apl_percent=apl,
+                box_side_mm=as_float(sample.get("box_side_mm")),
+                fits_screen=fits_screen,
+                luminance=luminance if fits_screen else None,
+                x_chromaticity=as_float(sample.get("x_chromaticity")),
+                y_chromaticity=as_float(sample.get("y_chromaticity")),
+                skip_reason=str(sample.get("skip_reason") or ""),
+                timestamp=str(sample.get("timestamp") or ""),
+            )
+        )
+
+    if not samples:
+        warnings.append(f"no usable local dimming APL samples in {artifact_path}")
+        return None, warnings
+
+    return (
+        LocalDimmingAplCurve(
+            source=str(artifact_path.relative_to(run_dir) if artifact_path.is_relative_to(run_dir) else artifact_path),
+            display_model=str(artifact.get("display_model") or get_nested(test.data, "environment", "display_model", default="") or ""),
+            complete=bool(artifact.get("complete")) if "complete" in artifact else None,
+            artifact_generated_timestamp=str(artifact.get("artifact_generated_timestamp") or ""),
+            backlight_percent=as_float(artifact.get("backlight_percent")),
+            samples_attempted=as_int(artifact.get("samples_attempted")),
+            samples_collected=as_int(artifact.get("samples_collected")),
+            samples_skipped=as_int(artifact.get("samples_skipped")),
+            samples=samples,
+        ),
+        warnings,
+    )
+
+
 def polygon_area(points: list[tuple[float, float]]) -> float:
     if len(points) < 3:
         return 0.0
@@ -951,6 +1061,8 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
     warnings.extend(gamma_warnings)
     contrast = extract_contrast(tests)
     gamut = extract_gamut(tests, args.reference_gamut)
+    local_dimming_apl, apl_warnings = extract_local_dimming_apl(run_dir, tests)
+    warnings.extend(apl_warnings)
 
     return RunData(
         run_dir=run_dir,
@@ -962,6 +1074,7 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
         gamma=gamma,
         contrast=contrast,
         gamut=gamut,
+        local_dimming_apl=local_dimming_apl,
         warnings=warnings,
     )
 
@@ -979,23 +1092,24 @@ def render_report_card(
         4,
         2,
         width_ratios=[1.08, 1.42],
-        height_ratios=[0.62, 0.52, 5.65, 0.55],
+        height_ratios=[0.56, 0.48, 6.08, 0.27],
         left=0.035,
         right=0.985,
-        top=0.965,
-        bottom=0.045,
+        top=0.972,
+        bottom=0.035,
         wspace=0.13,
-        hspace=0.24,
+        hspace=0.16,
     )
 
     ax_header = fig.add_subplot(grid[0, :])
     ax_kpi = fig.add_subplot(grid[1, :])
     ax_matrix = fig.add_subplot(grid[2, 0])
-    chart_grid = grid[2, 1].subgridspec(2, 2, wspace=0.27, hspace=0.34)
+    chart_grid = grid[2, 1].subgridspec(3, 2, height_ratios=[1.0, 1.0, 0.95], wspace=0.27, hspace=0.56)
     ax_brightness = fig.add_subplot(chart_grid[0, 0])
     ax_gamma = fig.add_subplot(chart_grid[0, 1])
     ax_contrast = fig.add_subplot(chart_grid[1, 0])
     ax_gamut = fig.add_subplot(chart_grid[1, 1])
+    ax_local_dimming_apl = fig.add_subplot(chart_grid[2, :])
     ax_footer = fig.add_subplot(grid[3, :])
 
     render_header(ax_header, run, title)
@@ -1005,6 +1119,7 @@ def render_report_card(
     render_gamma(ax_gamma, run.gamma)
     render_contrast(ax_contrast, run.contrast)
     render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings)
+    render_local_dimming_apl(ax_local_dimming_apl, run.local_dimming_apl)
     render_footer(ax_footer, run)
 
     fig.patch.set_facecolor("white")
@@ -1202,6 +1317,124 @@ def render_contrast(ax: plt.Axes, contrast: ContrastCurve | None) -> None:
         ax.text(0.02, 0.94, "; ".join(note_parts), transform=ax.transAxes, fontsize=6.1, color="#C9342F", va="top")
 
 
+def render_local_dimming_apl(ax: plt.Axes, apl: LocalDimmingAplCurve | None) -> None:
+    style_chart(ax, "Peak luminance vs window size (backlight 100%)")
+    if apl is None:
+        placeholder(ax, "No APL data in this run")
+        return
+
+    measured = [sample for sample in apl.samples if sample.fits_screen and sample.luminance is not None]
+    skipped = [sample for sample in apl.samples if not sample.fits_screen]
+    all_apl = sorted({sample.apl_percent for sample in apl.samples})
+
+    if all_apl:
+        ax.set_xlim(max(0.0, min(all_apl) - 1.0), max(all_apl) + 2.0)
+        ax.set_xticks(all_apl)
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:g}"))
+
+    if not measured:
+        if skipped:
+            ax.scatter(
+                [sample.apl_percent for sample in skipped],
+                [0.0 for _sample in skipped],
+                facecolors="none",
+                edgecolors="#8C96A3",
+                s=22,
+                linewidths=0.9,
+                label="skipped",
+            )
+        ax.set_ylim(0, 1)
+        placeholder(ax, "No measurable APL samples")
+        return
+
+    measured = sorted(measured, key=lambda sample: sample.index)
+    measured_x = [sample.apl_percent for sample in measured]
+    measured_y = [float(sample.luminance) for sample in measured if sample.luminance is not None]
+    ax.plot(measured_x, measured_y, "o-", color="#A23E48", linewidth=1.35, markersize=3.0, label="measured")
+
+    y_min = min(measured_y)
+    y_max = max(measured_y)
+    y_span = max(y_max - y_min, 1.0)
+    y_bottom = max(0.0, y_min - max(y_span * 0.12, y_max * 0.05, 1.0))
+    y_top = y_max + max(y_span * 0.12, y_max * 0.04, 1.0)
+    ax.set_ylim(y_bottom, y_top)
+
+    if skipped:
+        marker_y = y_bottom + (y_top - y_bottom) * 0.055
+        for sample in skipped:
+            ax.axvline(sample.apl_percent, color="#D0D7DF", linestyle="--", linewidth=0.65, zorder=0)
+        ax.scatter(
+            [sample.apl_percent for sample in skipped],
+            [marker_y for _sample in skipped],
+            facecolors="white",
+            edgecolors="#8C96A3",
+            s=24,
+            linewidths=0.9,
+            label="skipped",
+            zorder=5,
+        )
+
+    peak = max(measured, key=lambda sample: float(sample.luminance or -math.inf))
+    ratio = y_max / y_min if y_min > 0 else None
+    attempted = apl.samples_attempted if apl.samples_attempted is not None else len(apl.samples)
+    collected = apl.samples_collected if apl.samples_collected is not None else len(measured)
+    badge_parts = [
+        f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}%",
+        f"{collected}/{attempted} measured",
+    ]
+    if ratio is not None:
+        badge_parts.insert(1, f"ratio {ratio:.2f}x")
+    if apl.artifact_generated_timestamp:
+        badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
+    ax.text(
+        0.985,
+        0.90,
+        " | ".join(badge_parts),
+        transform=ax.transAxes,
+        fontsize=5.8,
+        color="#3D4650",
+        ha="right",
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.3},
+    )
+
+    if apl.display_model:
+        ax.text(0.015, 0.90, shorten(apl.display_model, 34), transform=ax.transAxes, fontsize=5.8, color="#5E6874", va="top")
+    skip_note = summarize_apl_skips(skipped)
+    if skip_note:
+        ax.text(0.015, 0.74, f"skipped: {skip_note}", transform=ax.transAxes, fontsize=5.5, color="#7A4F00", va="top")
+    ax.text(
+        0.985,
+        0.72,
+        "APL = centered square area; i1DisplayPro at centre.",
+        transform=ax.transAxes,
+        fontsize=5.5,
+        color="#596574",
+        ha="right",
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.0},
+    )
+    ax.set_xlabel("APL (%)", fontsize=6.4)
+    ax.set_ylabel("Peak Y (cd/m^2)", fontsize=6.4)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.0, 0.56), fontsize=5.6, frameon=False)
+
+
+def summarize_apl_skips(skipped: list[LocalDimmingAplSample]) -> str:
+    if not skipped:
+        return ""
+    small = [sample.apl_percent for sample in skipped if "smaller than" in sample.skip_reason]
+    tall = [sample.apl_percent for sample in skipped if "exceeds screen height" in sample.skip_reason]
+    other = [sample for sample in skipped if sample.apl_percent not in set(small + tall)]
+    parts: list[str] = []
+    if small:
+        parts.append("too small " + ", ".join(f"{value:g}%" for value in small))
+    if tall:
+        parts.append("too large " + ", ".join(f"{value:g}%" for value in tall))
+    if other:
+        parts.append(f"other {len(other)}")
+    return "; ".join(parts)
+
+
 def render_gamut(
     ax: plt.Axes,
     gamut: GamutMetrics | None,
@@ -1307,9 +1540,9 @@ def render_advanced_chromaticity_background(ax: plt.Axes, warnings: list[str]) -
 
 
 def style_chart(ax: plt.Axes, title: str) -> None:
-    ax.set_title(title, loc="left", fontsize=9.4, weight="bold", pad=6)
+    ax.set_title(title, loc="left", fontsize=8.7, weight="bold", pad=4)
     ax.grid(True, linestyle=":", linewidth=0.55, color="#B9C2CC", alpha=0.9)
-    ax.tick_params(axis="both", labelsize=6.2, length=2.5)
+    ax.tick_params(axis="both", labelsize=5.8, length=2.5)
     for spine in ax.spines.values():
         spine.set_color("#CAD2DA")
         spine.set_linewidth(0.8)
@@ -1345,6 +1578,13 @@ def build_observations(run: RunData) -> list[str]:
         notes.append(f"Gamma {run.gamma.gamma:.3f}")
     if run.gamut and run.gamut.coverage_percent is not None:
         notes.append(f"{run.gamut.reference_name} coverage {run.gamut.coverage_percent:.1f}%")
+    if run.local_dimming_apl:
+        measured = [sample for sample in run.local_dimming_apl.samples if sample.fits_screen and sample.luminance is not None]
+        if measured:
+            peak = max(measured, key=lambda sample: float(sample.luminance or -math.inf))
+            attempted = run.local_dimming_apl.samples_attempted or len(run.local_dimming_apl.samples)
+            collected = run.local_dimming_apl.samples_collected or len(measured)
+            notes.append(f"APL peak {float(peak.luminance or 0.0):.1f} cd/m2 @ {peak.apl_percent:g}% ({collected}/{attempted})")
     if run.contrast and run.contrast.result != "PASS":
         notes.append("Contrast chart uses partial measurement data")
     if run.header.display_serial_number.startswith("DUMMY"):

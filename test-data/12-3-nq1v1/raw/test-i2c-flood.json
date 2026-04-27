@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-i2c-flood-20260427-110131",
+  "test_id": "test-i2c-flood-20260427-140044",
   "test_info": {
     "name": "test-i2c-flood",
     "category": "integration",
@@ -9,8 +9,8 @@
     "file": "tests/01-integration/test-i2c-flood.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:01:26Z",
-    "end_time": "2026-04-27T09:01:31Z",
+    "start_time": "2026-04-27T12:00:39Z",
+    "end_time": "2026-04-27T12:00:44Z",
     "duration_ms": 5000,
     "exit_code": 3,
     "result": "ERROR",

@@ -18,7 +18,7 @@ The first implementation is per-run only. Cross-run comparison, dashboards, PDF 
 
 ## Current Fixture Runs
 
-- `test-data/12-3-nq1v1`: 21 tests, 16 pass, 3 skip, 2 errors.
+- `test-data/12-3-nq1v1`: 22 tests, 17 pass, 3 skip, 2 errors.
 - `test-data/15-6-0od`: 20 tests, 16 pass, 2 skip, 2 errors.
 
 Both fixtures include the current gamma extension:
@@ -35,12 +35,18 @@ back to the 9-point brightness-linearity data:
 - `artifacts/brightness-calibration-81step.json`
 - `artifacts/brightness-calibration-81step.csv`
 
+The 12.3" fixture also includes the local-dimming APL extension:
+
+- `raw/test-local-dimming-apl.json`
+- `artifacts/local-dimming-apl-sweep.json`
+- `artifacts/local-dimming-apl-sweep.csv`
+
 ## Usage
 
 ```bash
 python3 src/display_report_card.py \
   --input test-data/12-3-nq1v1 \
-  --output out/run-20260426-085300-report-card.png
+  --output out/12-3-report-card.png
 ```
 
 For repeated use on a development host, install the local console command inside a virtualenv:
@@ -51,7 +57,7 @@ python3 -m venv --system-site-packages .venv
 
 .venv/bin/display-report-card \
   --input test-data/12-3-nq1v1 \
-  --output out/run-20260426-085300-report-card.png
+  --output out/12-3-report-card.png
 ```
 
 On Raspberry Pi targets, the direct script path remains the simplest basic-mode invocation when

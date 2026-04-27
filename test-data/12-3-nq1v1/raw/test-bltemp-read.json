@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-bltemp-read-20260427-110122",
+  "test_id": "test-bltemp-read-20260427-140035",
   "test_info": {
     "name": "test-bltemp-read",
     "category": "unit",
@@ -9,9 +9,9 @@
     "file": "tests/00-unit/test-bltemp-read.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:01:20Z",
-    "end_time": "2026-04-27T09:01:22Z",
-    "duration_ms": 2000,
+    "start_time": "2026-04-27T12:00:34Z",
+    "end_time": "2026-04-27T12:00:35Z",
+    "duration_ms": 1000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0
@@ -23,9 +23,9 @@
     "framework_version": "0.1.0"
   },
   "data": {
-    "raw_bytes": "0x0b 0x2e 0x01 0x44",
-    "adc_raw": "2862",
-    "temperature_degc": "32.4",
+    "raw_bytes": "0x0a 0xa5 0x01 0x68",
+    "adc_raw": "2725",
+    "temperature_degc": "36.0",
     "range_min": "-20",
     "range_max": "85"
   },
@@ -43,12 +43,12 @@
     }, {
       "name": "adc_nonzero",
       "expected": ">0",
-      "actual": "2862",
+      "actual": "2725",
       "result": "PASS"
     }, {
       "name": "temp_in_range",
       "expected": "-20-85",
-      "actual": "32.4",
+      "actual": "36.0",
       "result": "PASS"
     }],
     "passed": 4,

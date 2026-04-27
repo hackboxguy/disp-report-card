@@ -1,0 +1,47 @@
+[14:28:14] APL sweep parameters:
+[14:28:14]   APL steps:        1 2 3 4 5 10 15 20 25 30 35 40 45 50
+[14:28:14]   Backlight:        100%
+[14:28:14]   Diagonal:         12.3" (312.4200 mm)
+[14:28:14]   Aspect ratio:     1920:720
+[14:28:14]   Screen WxH (mm):  292.53 x 109.70
+[14:28:14]   Screen area:      32090.54 mm²
+[14:28:14]   Min box size:     25 mm (i1 sensor lens limit)
+[14:28:14]   Settle time:      3s per step
+[14:28:15] Pattern generator not running, attempting to start...
+[14:28:20]
+[14:28:20] Setting backlight to 100%...
+[14:28:21]
+[14:28:21] Starting APL sweep...
+[14:28:21] [1/14] APL 1% -> 17.91mm: box side 17.91mm smaller than i1 sensor minimum 25mm
+[14:28:21] [2/14] APL 2% -> 25.33mm square...
+[14:28:27]   Y = 101.818332 cd/m²  (x=0.293364 y=0.281659)
+[14:28:27] [3/14] APL 3% -> 31.03mm square...
+[14:28:32]   Y = 145.103055 cd/m²  (x=0.292096 y=0.283747)
+[14:28:32] [4/14] APL 4% -> 35.83mm square...
+[14:28:37]   Y = 162.624452 cd/m²  (x=0.292610 y=0.284142)
+[14:28:37] [5/14] APL 5% -> 40.06mm square...
+[14:28:42]   Y = 207.435596 cd/m²  (x=0.292749 y=0.284664)
+[14:28:42] [6/14] APL 10% -> 56.65mm square...
+[14:28:47]   Y = 336.620647 cd/m²  (x=0.295085 y=0.288319)
+[14:28:47] [7/14] APL 15% -> 69.38mm square...
+[14:28:52]   Y = 453.269706 cd/m²  (x=0.297186 y=0.291420)
+[14:28:52] [8/14] APL 20% -> 80.11mm square...
+[14:28:58]   Y = 522.026157 cd/m²  (x=0.298921 y=0.294009)
+[14:28:58] [9/14] APL 25% -> 89.57mm square...
+[14:29:03]   Y = 620.731176 cd/m²  (x=0.300471 y=0.296177)
+[14:29:03] [10/14] APL 30% -> 98.12mm square...
+[14:29:08]   Y = 828.013132 cd/m²  (x=0.300811 y=0.296695)
+[14:29:08] [11/14] APL 35% -> 105.98mm square...
+[14:29:28]   Y = 871.972473 cd/m²  (x=0.301894 y=0.298210)
+[14:29:28] [12/14] APL 40% -> 113.30mm: box side 113.30mm exceeds screen height 109.70mm
+[14:29:28] [13/14] APL 45% -> 120.17mm: box side 120.17mm exceeds screen height 109.70mm
+[14:29:28] [14/14] APL 50% -> 126.67mm: box side 126.67mm exceeds screen height 109.70mm
+[14:29:28]
+[14:29:28] APL sweep complete: 10 measured, 4 skipped (out-of-screen)
+[14:29:28] Wrote artifact: artifacts/local-dimming-apl-sweep.json (10 samples)
+[14:29:28]
+[14:29:28] Note: 4 APL step(s) skipped (see fits_screen=false in artifact).
+[14:29:28] Two reasons can cause skips:
+[14:29:28]   - Box smaller than 25mm (i1 sensor lens limit) — typical at very low APL
+[14:29:28]   - Box larger than screen height 109.70mm — typical at high APL on non-square screens
+[14:29:28] For 16:9 screens max square APL is ~56%; for 8:3 ~37%.

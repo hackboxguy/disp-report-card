@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-ioc-i2c-flood-20260427-110140",
+  "test_id": "test-ioc-i2c-flood-20260427-140053",
   "test_info": {
     "name": "test-ioc-i2c-flood",
     "category": "integration",
@@ -9,11 +9,11 @@
     "file": "tests/01-integration/test-ioc-i2c-flood.sh"
   },
   "execution": {
-    "start_time": "2026-04-27T09:01:31Z",
-    "end_time": "2026-04-27T09:01:40Z",
+    "start_time": "2026-04-27T12:00:44Z",
+    "end_time": "2026-04-27T12:00:53Z",
     "duration_ms": 9000,
-    "exit_code": 0,
-    "result": "PASS",
+    "exit_code": 3,
+    "result": "ERROR",
     "retries": 0
   },
   "environment": {
@@ -26,11 +26,11 @@
     "iterations": 50,
     "delay_ms": 100,
     "total_operations": 150,
-    "total_passed": 150,
-    "total_failed": 0,
+    "total_passed": 146,
+    "total_failed": 4,
     "iocversion": { "passed": 50, "failed": 0 },
     "bltemp": { "passed": 50, "failed": 0 },
-    "rtq6749": { "passed": 50, "failed": 0 },
+    "rtq6749": { "passed": 46, "failed": 4 },
     "reference_fw_version": "v01.06"
   },
   "validation": {
@@ -47,11 +47,11 @@
     }, {
       "name": "rtq6749_success_rate",
       "expected": "50",
-      "actual": "50",
-      "result": "PASS"
+      "actual": "46",
+      "result": "FAIL"
     }],
-    "passed": 3,
-    "failed": 0
+    "passed": 2,
+    "failed": 1
   },
-  "errors": []
+  "errors": ["IOC I2C flood: 4/150 operations failed"]
 }
