@@ -1388,7 +1388,7 @@ def render_local_dimming_apl(ax: plt.Axes, apl: LocalDimmingAplCurve | None) -> 
         badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
     ax.text(
         0.985,
-        0.90,
+        0.235,
         " | ".join(badge_parts),
         transform=ax.transAxes,
         fontsize=5.8,
@@ -1405,7 +1405,7 @@ def render_local_dimming_apl(ax: plt.Axes, apl: LocalDimmingAplCurve | None) -> 
         ax.text(0.015, 0.74, f"skipped: {skip_note}", transform=ax.transAxes, fontsize=5.5, color="#7A4F00", va="top")
     ax.text(
         0.985,
-        0.72,
+        0.125,
         "APL = centered square area; i1DisplayPro at centre.",
         transform=ax.transAxes,
         fontsize=5.5,
