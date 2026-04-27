@@ -22,18 +22,23 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
     def test_loads_12_3_fixture(self) -> None:
         run = load_run_folder(REPO_ROOT / "test-data" / "12-3-nq1v1", loader_args())
 
-        self.assertEqual(run.header.run_id, "run-20260426-085300")
+        self.assertEqual(run.header.run_id, "run-20260427-110120")
         self.assertEqual(run.header.display_size, '12.3"')
         self.assertEqual(run.header.display_resolution, "1920x720")
-        self.assertEqual(len(run.status_rows), 20)
+        self.assertEqual(len(run.status_rows), 21)
+        self.assertEqual(run.brightness.source, "artifacts/brightness-calibration-81step.json")
+        self.assertEqual(len(run.brightness.brightness_percent), 81)
+        self.assertEqual(run.brightness.sample_count, 81)
+        self.assertTrue(run.brightness.complete)
+        self.assertFalse(run.brightness.from_cache)
         self.assertIsNotNone(run.gamma)
-        self.assertAlmostEqual(run.gamma.gamma, 2.186854778899406)
+        self.assertAlmostEqual(run.gamma.gamma, 2.183730190299274)
         self.assertEqual(len(run.gamma.code), 33)
         self.assertEqual(run.contrast.result, "PASS")
         self.assertEqual(len(run.contrast.brightness), 5)
         self.assertEqual(run.gamut.reference_name, "NTSC 1953")
         self.assertEqual(run.gamut.reference_white_name, "D65")
-        self.assertAlmostEqual(run.gamut.coverage_percent, 79.2037177619253)
+        self.assertAlmostEqual(run.gamut.coverage_percent, 78.99485491040967)
         self.assertFalse(run.gamut.white_within_tolerance)
 
     def test_loads_15_6_fixture_with_partial_contrast(self) -> None:

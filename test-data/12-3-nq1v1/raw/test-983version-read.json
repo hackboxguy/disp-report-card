@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-983version-read-20260426-085301",
+  "test_id": "test-983version-read-20260427-110120",
   "test_info": {
     "name": "test-983version-read",
     "category": "unit",
@@ -9,8 +9,8 @@
     "file": "tests/00-unit/test-983version-read.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:53:01Z",
-    "end_time": "2026-04-26T06:53:01Z",
+    "start_time": "2026-04-27T09:01:20Z",
+    "end_time": "2026-04-27T09:01:20Z",
     "duration_ms": 0,
     "exit_code": 0,
     "result": "PASS",

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-pattern-bist-20260427-112816",
+  "test_info": {
+    "name": "test-pattern-bist",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Validate FPGA BIST patterns (red, green, blue, white, black)",
+    "file": "tests/02-validation/test-pattern-bist.sh"
+  },
+  "execution": {
+    "start_time": "2026-04-27T09:28:16Z",
+    "end_time": "2026-04-27T09:28:16Z",
+    "duration_ms": 0,
+    "exit_code": 2,
+    "result": "SKIP",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "12.3-nq1-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {},
+  "validation": {
+    "checks": [],
+    "passed": 0,
+    "failed": 0
+  },
+  "errors": ["Test skipped: Display model 12.3-nq1-lattice-ecp5 does not support FPGA BIST patterns"]
+}

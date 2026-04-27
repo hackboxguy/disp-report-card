@@ -1,14 +1,14 @@
 {
-  "run_id": "run-20260426-085300",
+  "run_id": "run-20260427-110120",
   "test_suite": "full",
   "display_model": "12.3-nq1-lattice-ecp5",
   "i2c_device": "/dev/i2c-1",
   "dataformat": "auto",
-  "timestamp": "2026-04-26T07:20:06Z",
-  "total_tests": 20,
-  "passed": 17,
+  "timestamp": "2026-04-27T09:28:16Z",
+  "total_tests": 21,
+  "passed": 16,
   "failed": 0,
-  "skipped": 2,
-  "errors": 1,
-  "results_dir": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300"
+  "skipped": 3,
+  "errors": 2,
+  "results_dir": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260427-110120"
 }

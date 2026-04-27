@@ -1,23 +1,23 @@
-[09:04:32] Color gamut measurement parameters:
-[09:04:32]   Brightness: 100%
-[09:04:32]   Colors: R, G, B, C, M, Y, W
-[09:04:32]   Settle time: 2s
-[09:04:32] 
-[09:04:32] Starting pattern-generator...
-[09:04:37] Pattern-generator is running
-[09:04:37] 
-[09:04:37] Setting brightness to 100%...
-[09:04:38] Brightness set successfully
-[09:04:40] 
-[09:04:40] Measuring RGBCMYW colors...
-[09:05:49] WARNING: measure-display.sh returned non-zero exit code (may have had retries)
-[09:05:49] Continuing to parse CSV output for valid measurements...
-[09:05:49] 
-[09:05:49] Parsing measurement data...
-[09:05:49] 
-[09:05:49] Parsed 7 color measurements (7 successful, 0 failed)
-[09:05:49] 
-[09:05:49] Color gamut measurement: PASS (all 7 colors measured)
-[09:05:49] 
-[09:05:49] Cleaning up...
-[09:05:50] Pattern turned off
+[11:12:38] Color gamut measurement parameters:
+[11:12:38]   Brightness: 100%
+[11:12:38]   Colors: R, G, B, C, M, Y, W
+[11:12:38]   Settle time: 2s
+[11:12:38]
+[11:12:38] Starting pattern-generator...
+[11:12:43] Pattern-generator is running
+[11:12:43]
+[11:12:43] Setting brightness to 100%...
+[11:12:45] Brightness set successfully
+[11:12:47]
+[11:12:47] Measuring RGBCMYW colors...
+[11:13:56] WARNING: measure-display.sh returned non-zero exit code (may have had retries)
+[11:13:56] Continuing to parse CSV output for valid measurements...
+[11:13:56]
+[11:13:56] Parsing measurement data...
+[11:13:56]
+[11:13:56] Parsed 7 color measurements (7 successful, 0 failed)
+[11:13:56]
+[11:13:56] Color gamut measurement: PASS (all 7 colors measured)
+[11:13:56]
+[11:13:56] Cleaning up...
+[11:13:56] Pattern turned off

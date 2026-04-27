@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-contrast-sequential-20260426-090817",
+  "test_id": "test-contrast-sequential-20260427-111628",
   "test_info": {
     "name": "test-contrast-sequential",
     "category": "validation",
@@ -9,9 +9,9 @@
     "file": "tests/02-validation/test-contrast-sequential.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T07:05:51Z",
-    "end_time": "2026-04-26T07:08:17Z",
-    "duration_ms": 146000,
+    "start_time": "2026-04-27T09:13:57Z",
+    "end_time": "2026-04-27T09:16:28Z",
+    "duration_ms": 151000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0
@@ -28,42 +28,42 @@
     "min_contrast_spec": 1000,
     "contrast_measurements": [{
       "brightness": 12.5,
-      "white_luminance": 13.138479,
+      "white_luminance": 12.823090,
       "black_luminance": 0.000000,
-      "contrast_ratio": 1313.8,
-      "contrast_ratio_display": ">1313.8",
+      "contrast_ratio": 1282.3,
+      "contrast_ratio_display": ">1282.3",
       "below_detection_threshold": true,
       "measurement_status": "PASS"
     }, {
       "brightness": 25,
-      "white_luminance": 26.204712,
+      "white_luminance": 25.302385,
       "black_luminance": 0.000000,
-      "contrast_ratio": 2620.4,
-      "contrast_ratio_display": ">2620.4",
+      "contrast_ratio": 2530.2,
+      "contrast_ratio_display": ">2530.2",
       "below_detection_threshold": true,
       "measurement_status": "PASS"
     }, {
       "brightness": 50,
-      "white_luminance": 53.614928,
+      "white_luminance": 51.697517,
       "black_luminance": 0.000000,
-      "contrast_ratio": 5361.4,
-      "contrast_ratio_display": ">5361.4",
+      "contrast_ratio": 5169.7,
+      "contrast_ratio_display": ">5169.7",
       "below_detection_threshold": true,
       "measurement_status": "PASS"
     }, {
       "brightness": 75,
-      "white_luminance": 81.195232,
+      "white_luminance": 77.511751,
       "black_luminance": 0.000000,
-      "contrast_ratio": 8119.5,
-      "contrast_ratio_display": ">8119.5",
+      "contrast_ratio": 7751.1,
+      "contrast_ratio_display": ">7751.1",
       "below_detection_threshold": true,
       "measurement_status": "PASS"
     }, {
       "brightness": 100,
-      "white_luminance": 109.070861,
+      "white_luminance": 103.765295,
       "black_luminance": 0.000000,
-      "contrast_ratio": 10907.0,
-      "contrast_ratio_display": ">10907.0",
+      "contrast_ratio": 10376.5,
+      "contrast_ratio_display": ">10376.5",
       "below_detection_threshold": true,
       "measurement_status": "PASS"
     }]
@@ -77,7 +77,7 @@
     }, {
       "name": "contrast_at_50%",
       "expected": ">= 1000:1",
-      "actual": ">5361.4:1",
+      "actual": ">5169.7:1",
       "result": "PASS"
     }],
     "passed": 2,

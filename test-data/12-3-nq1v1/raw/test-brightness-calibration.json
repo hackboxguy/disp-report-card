@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-brightness-calibration-20260426-090249",
+  "test_id": "test-brightness-calibration-20260427-111117",
   "test_info": {
     "name": "test-brightness-calibration",
     "category": "validation",
@@ -9,9 +9,9 @@
     "file": "tests/02-validation/test-brightness-calibration.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:53:20Z",
-    "end_time": "2026-04-26T07:02:49Z",
-    "duration_ms": 569000,
+    "start_time": "2026-04-27T09:01:40Z",
+    "end_time": "2026-04-27T09:11:17Z",
+    "duration_ms": 577000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0
@@ -24,9 +24,13 @@
   },
   "data": {
     "calibration_file": "/home/pi/micropanel/share/disptool/display-test-framework/config/calibration/12.3-nq1-lattice-ecp5-brightness.json",
+    "calibration_json": "artifacts/brightness-calibration-81step.json",
+    "calibration_csv":  "artifacts/brightness-calibration-81step.csv",
     "total_samples": 81,
+    "samples_collected": 81,
     "brightness_range": "0%-100%",
-    "brightness_step": "1.25%"
+    "brightness_step": "1.25%",
+    "from_cache": false
   },
   "validation": {
     "checks": [{

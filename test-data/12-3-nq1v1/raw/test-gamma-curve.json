@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-gamma-curve-20260426-092006",
+  "test_id": "test-gamma-curve-20260427-112816",
   "test_info": {
     "name": "test-gamma-curve",
     "category": "validation",
@@ -9,9 +9,9 @@
     "file": "tests/02-validation/test-gamma-curve.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T07:08:18Z",
-    "end_time": "2026-04-26T07:20:06Z",
-    "duration_ms": 708000,
+    "start_time": "2026-04-27T09:16:30Z",
+    "end_time": "2026-04-27T09:28:16Z",
+    "duration_ms": 706000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0
@@ -23,23 +23,23 @@
     "framework_version": "0.1.0"
   },
   "data": {
-    "gamma": 2.186854778899406,
+    "gamma": 2.183730190299274,
     "y_black_nits": 0,
-    "y_max_nits": 1065.872957,
+    "y_max_nits": 1052.6932983333334,
     "contrast_ratio": 1000000,
-    "rms_residual_gamma": 0.0680107873689985,
-    "rms_residual_srgb": 0.3567887295987798,
+    "rms_residual_gamma": 0.06824569676210958,
+    "rms_residual_srgb": 0.35365491292604184,
     "num_patches": 33,
     "samples_per_patch": 3,
     "backlight_percent": 100,
-    "csv_path": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_curve_test-gamma-curve.csv",
-    "progress_log": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-085300/artifacts/gamma_progress.log"
+    "csv_path": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260427-110120/artifacts/gamma_curve_test-gamma-curve.csv",
+    "progress_log": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260427-110120/artifacts/gamma_progress.log"
   },
   "validation": {
     "checks": [{
       "name": "gamma_in_range",
       "expected": "1.8-2.6",
-      "actual": "2.186854778899406",
+      "actual": "2.183730190299274",
       "result": "PASS"
     }, {
       "name": "contrast_ratio_ok",
@@ -54,7 +54,7 @@
     }, {
       "name": "rms_residual_ok",
       "expected": "<=0.15",
-      "actual": "0.0680107873689985",
+      "actual": "0.06824569676210958",
       "result": "PASS"
     }],
     "passed": 4,

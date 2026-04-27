@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-version-read-20260426-085307",
+  "test_id": "test-version-read-20260427-110126",
   "test_info": {
     "name": "test-version-read",
     "category": "unit",
@@ -9,8 +9,8 @@
     "file": "tests/00-unit/test-version-read.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:53:05Z",
-    "end_time": "2026-04-26T06:53:07Z",
+    "start_time": "2026-04-27T09:01:24Z",
+    "end_time": "2026-04-27T09:01:26Z",
     "duration_ms": 2000,
     "exit_code": 0,
     "result": "PASS",

@@ -8,6 +8,7 @@
 - Done: implemented the initial report-card generator in `src/display_report_card.py`.
 - Done: added focused extraction tests in `tests/`.
 - Done: verified PNG generation for both bundled fixture runs.
+- Done: refreshed the 12.3" fixture with the v6 fresh 81-step brightness calibration run.
 - Done: switched the default gamut panel to NTSC 1953 primaries with D65 white reference.
 - Done: added gamut coverage, relative area, D65 tolerance, and white-point distance indicators.
 - Done: added `--render basic|advanced`; `basic` stays lightweight and `advanced` uses optional host-PC chromaticity rendering when available.

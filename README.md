@@ -18,7 +18,7 @@ The first implementation is per-run only. Cross-run comparison, dashboards, PDF 
 
 ## Current Fixture Runs
 
-- `test-data/12-3-nq1v1`: 20 tests, 17 pass, 2 skip, 1 error.
+- `test-data/12-3-nq1v1`: 21 tests, 16 pass, 3 skip, 2 errors.
 - `test-data/15-6-0od`: 20 tests, 16 pass, 2 skip, 2 errors.
 
 Both fixtures include the current gamma extension:
@@ -27,7 +27,8 @@ Both fixtures include the current gamma extension:
 - `artifacts/gamma_curve_test-gamma-curve.csv`
 - `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
 
-When present, the report uses the structured 81-step brightness calibration artifact before falling
+The 12.3" fixture includes a fresh structured 81-step brightness calibration artifact. When present,
+the report uses the structured calibration artifact before falling
 back to the 9-point brightness-linearity data:
 
 - `raw/test-brightness-calibration.json`
