@@ -1092,19 +1092,19 @@ def render_report_card(
         4,
         2,
         width_ratios=[1.08, 1.42],
-        height_ratios=[0.56, 0.48, 6.08, 0.27],
+        height_ratios=[0.50, 0.40, 6.55, 0.20],
         left=0.035,
         right=0.985,
-        top=0.972,
-        bottom=0.035,
+        top=0.985,
+        bottom=0.018,
         wspace=0.13,
-        hspace=0.16,
+        hspace=0.09,
     )
 
     ax_header = fig.add_subplot(grid[0, :])
     ax_kpi = fig.add_subplot(grid[1, :])
     ax_matrix = fig.add_subplot(grid[2, 0])
-    chart_grid = grid[2, 1].subgridspec(3, 2, height_ratios=[1.0, 1.0, 0.95], wspace=0.27, hspace=0.56)
+    chart_grid = grid[2, 1].subgridspec(3, 2, height_ratios=[1.0, 1.0, 0.95], wspace=0.27, hspace=0.46)
     ax_brightness = fig.add_subplot(chart_grid[0, 0])
     ax_gamma = fig.add_subplot(chart_grid[0, 1])
     ax_contrast = fig.add_subplot(chart_grid[1, 0])
