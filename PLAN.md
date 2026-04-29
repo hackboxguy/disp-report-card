@@ -15,6 +15,7 @@
 - Done: added packaging metadata, a console entry point, repeatable make targets, and edge-case parser tests.
 - Done: consume the structured 81-step brightness calibration artifact when it is present.
 - Done: consume and render the local-dimming APL sweep artifact when it is present.
+- Done: add comparison mode for baseline/run overlays and changed-test highlighting.
 - Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata

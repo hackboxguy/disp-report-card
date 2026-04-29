@@ -66,6 +66,7 @@ dependencies are provided by apt packages.
 Options:
 
 - `--input` - required result folder.
+- `--base-input` - optional baseline result folder; when provided, report charts overlay baseline and run curves.
 - `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
 - `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`; default is `ntsc`.
 - `--render` - `basic` by default, or `advanced` for an optional CIE chromaticity background when `colour-science` is installed.
@@ -77,6 +78,23 @@ The default gamut panel uses NTSC 1953 primaries with D65 white. It reports refe
 relative measured area, measured white-point offset, and distance against the default D65 tolerance
 ellipse of `0.010`.
 
+### Comparison Mode
+
+Comparison mode overlays a baseline run and the current run on shared chart scales. FPGA labels
+come from `raw/test-version-read.json`.
+
+```bash
+python3 src/display_report_card.py \
+  --base-input test-data/12-3-nq1v1 \
+  --input test-data/12-3-nq1v1-03 \
+  --output out/12-3-v02-v03-compare.png
+
+make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03 \
+  OUT=out/12-3-v02-v03-compare.png
+```
+
+The test matrix remains run-focused and highlights result changes from the baseline.
+
 ## Verification
 
 ```bash
@@ -84,6 +102,7 @@ make test
 
 make test-data/12-3-nq1v1
 make report-samples
+make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03
 make report-samples-advanced PYTHON=.venv/bin/python
 make clean
 ```

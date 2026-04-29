@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.display_report_card import load_run_folder
+from src.display_report_card import comparison_status_rows, format_fpga_label, load_run_folder, render_report_card
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -290,6 +290,26 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         apl_row = next(row for row in run.status_rows if row.name == "test-local-dimming-apl")
         self.assertEqual(apl_row.note, "2/3 APL, 1 skip")
 
+    def test_comparison_mode_highlights_result_changes_and_renders(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base_dir = root / "base"
+            run_dir = root / "run"
+            write_minimal_run(base_dir, "base-run", "v02", "April 9", "ERROR")
+            write_minimal_run(run_dir, "run-run", "v03", "April 29", "PASS")
+
+            base = load_run_folder(base_dir, loader_args())
+            run = load_run_folder(run_dir, loader_args())
+            rows = comparison_status_rows(run, base)
+            changed = next(row for row in rows if row.name == "test-ioc-i2c-flood")
+            output = root / "compare.png"
+            render_report_card(run, output, "Display Test Report Card", 72, "ntsc", "basic", base)
+
+            self.assertEqual(format_fpga_label(base), "v02 Apr 9")
+            self.assertEqual(format_fpga_label(run), "v03 Apr 29")
+            self.assertEqual(changed.note, "was ERROR; 150/150 ops ok")
+            self.assertTrue(output.exists())
+
     def test_malformed_optional_raw_json_is_skipped_with_warning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             run_dir = Path(temp_dir)
@@ -315,6 +335,40 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def write_minimal_run(path: Path, run_id: str, fpga_version: str, fpga_date: str, ioc_flood_result: str) -> None:
+    raw_dir = path / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    write_json(
+        path / "summary.json",
+        {
+            "run_id": run_id,
+            "timestamp": "2026-04-29T07:00:00Z",
+            "display_model": "12.3-nq1-lattice-ecp5",
+            "total_tests": 2,
+            "passed": 2 if ioc_flood_result == "PASS" else 1,
+            "failed": 0,
+            "errors": 0 if ioc_flood_result == "PASS" else 1,
+            "skipped": 0,
+        },
+    )
+    write_json(
+        raw_dir / "test-version-read.json",
+        {
+            "test_info": {"name": "test-version-read", "category": "unit"},
+            "execution": {"result": "PASS"},
+            "data": {"version": fpga_version, "date": fpga_date},
+        },
+    )
+    write_json(
+        raw_dir / "test-ioc-i2c-flood.json",
+        {
+            "test_info": {"name": "test-ioc-i2c-flood", "category": "integration"},
+            "execution": {"result": ioc_flood_result},
+            "data": {"total_operations": 150, "failed_operations": 0},
+        },
+    )
 
 
 def brightness_sample(index: int, brightness_percent: float, luminance: float) -> dict:

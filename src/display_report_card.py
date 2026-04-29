@@ -32,6 +32,7 @@ import numpy as np
 A4_LANDSCAPE_INCHES = (11.69, 8.27)
 DEFAULT_DPI = 200
 DEFAULT_WHITE_TOLERANCE = 0.010
+BASELINE_COLOR = "#6E7781"
 
 STATUS_COLORS = {
     "PASS": "#1B8A5A",
@@ -227,6 +228,12 @@ class RunData:
     warnings: list[str]
 
 
+@dataclass
+class SeriesLabels:
+    run: str
+    base: str
+
+
 def load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -275,6 +282,12 @@ def format_timestamp(value: str) -> str:
     except ValueError:
         return value
     return parsed.strftime("%Y-%m-%d %H:%M:%S %Z").strip()
+
+
+def safe_filename(value: str) -> str:
+    cleaned = "".join(char if char.isalnum() or char in "-._" else "-" for char in value)
+    cleaned = "-".join(part for part in cleaned.split("-") if part)
+    return cleaned or "report"
 
 
 def derive_display_size(display_model: str) -> str:
@@ -549,6 +562,22 @@ def build_status_note(test: RawTest) -> str:
     if test.result == "SKIP":
         return "skipped"
     return ""
+
+
+def comparison_status_rows(run: RunData, base_run: RunData | None) -> list[StatusRow]:
+    if base_run is None:
+        return run.status_rows
+    base_rows = {row.name: row for row in base_run.status_rows}
+    rows: list[StatusRow] = []
+    for row in run.status_rows:
+        note = row.note
+        base_row = base_rows.get(row.name)
+        if base_row is None:
+            note = f"new; {note}" if note else "new"
+        elif base_row.result != row.result:
+            note = f"was {base_row.result}; {note}" if note else f"was {base_row.result}"
+        rows.append(StatusRow(name=row.name, category=row.category, result=row.result, note=note))
+    return rows
 
 
 def extract_brightness(run_dir: Path, tests: dict[str, RawTest]) -> tuple[BrightnessCurve | None, list[str]]:
@@ -1079,6 +1108,35 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
     )
 
 
+def format_fpga_label(run: RunData) -> str:
+    version = run.header.fpga_sw_version.strip()
+    if version.startswith("DUMMY") or version == "TBD":
+        version = ""
+    companion = run.header.fpga_companion.split("/", 1)[0].strip()
+    companion = (
+        companion.replace("January", "Jan")
+        .replace("February", "Feb")
+        .replace("March", "Mar")
+        .replace("April", "Apr")
+        .replace("June", "Jun")
+        .replace("July", "Jul")
+        .replace("August", "Aug")
+        .replace("September", "Sep")
+        .replace("October", "Oct")
+        .replace("November", "Nov")
+        .replace("December", "Dec")
+    )
+    label = " ".join(part for part in (version, companion) if part)
+    return label or shorten(run.header.run_id, 18)
+
+
+def series_labels(run: RunData, base_run: RunData | None) -> SeriesLabels:
+    return SeriesLabels(
+        run=f"run {format_fpga_label(run)}" if base_run else "measured",
+        base=f"base {format_fpga_label(base_run)}" if base_run else "base",
+    )
+
+
 def render_report_card(
     run: RunData,
     output: Path,
@@ -1086,6 +1144,7 @@ def render_report_card(
     dpi: int,
     reference_gamut: str,
     render_mode: str,
+    base_run: RunData | None = None,
 ) -> None:
     fig = plt.figure(figsize=A4_LANDSCAPE_INCHES, dpi=dpi, facecolor="white")
     grid = fig.add_gridspec(
@@ -1112,15 +1171,16 @@ def render_report_card(
     ax_local_dimming_apl = fig.add_subplot(chart_grid[2, :])
     ax_footer = fig.add_subplot(grid[3, :])
 
-    render_header(ax_header, run, title)
+    labels = series_labels(run, base_run)
+    render_header(ax_header, run, title, base_run)
     render_kpis(ax_kpi, run)
-    render_status_matrix(ax_matrix, run.status_rows)
-    render_brightness(ax_brightness, run.brightness)
-    render_gamma(ax_gamma, run.gamma)
-    render_contrast(ax_contrast, run.contrast)
-    render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings)
-    render_local_dimming_apl(ax_local_dimming_apl, run.local_dimming_apl)
-    render_footer(ax_footer, run)
+    render_status_matrix(ax_matrix, comparison_status_rows(run, base_run))
+    render_brightness(ax_brightness, run.brightness, base_run.brightness if base_run else None, labels)
+    render_gamma(ax_gamma, run.gamma, base_run.gamma if base_run else None, labels)
+    render_contrast(ax_contrast, run.contrast, base_run.contrast if base_run else None, labels)
+    render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings, base_run.gamut if base_run else None, labels)
+    render_local_dimming_apl(ax_local_dimming_apl, run.local_dimming_apl, base_run.local_dimming_apl if base_run else None, labels)
+    render_footer(ax_footer, run, base_run)
 
     fig.patch.set_facecolor("white")
     fig.patch.set_alpha(1.0)
@@ -1132,12 +1192,16 @@ def render_report_card(
     plt.close(fig)
 
 
-def render_header(ax: plt.Axes, run: RunData, title: str) -> None:
+def render_header(ax: plt.Axes, run: RunData, title: str, base_run: RunData | None = None) -> None:
     ax.axis("off")
     ax.add_patch(Rectangle((0, 0), 1, 1, transform=ax.transAxes, color="#F2F5F8", zorder=0))
     header = run.header
-    ax.text(0.014, 0.66, title, fontsize=15.5, weight="bold", color="#17202A", transform=ax.transAxes)
-    ax.text(0.014, 0.24, header.run_id, fontsize=8.8, color="#44515F", transform=ax.transAxes)
+    display_title = "Display Compare Report" if base_run and title == "Display Test Report Card" else title
+    run_id_text = header.run_id
+    if base_run:
+        run_id_text = f"run {header.run_id}  |  base {base_run.header.run_id}"
+    ax.text(0.014, 0.66, display_title, fontsize=13.2 if base_run else 15.5, weight="bold", color="#17202A", transform=ax.transAxes)
+    ax.text(0.014, 0.24, run_id_text, fontsize=7.6 if base_run else 8.8, color="#44515F", transform=ax.transAxes)
 
     row1 = [
         ("Timestamp", format_timestamp(header.timestamp)),
@@ -1146,7 +1210,7 @@ def render_header(ax: plt.Axes, run: RunData, title: str) -> None:
     ]
     row2 = [
         ("Serial", header.display_serial_number),
-        ("FPGA", f"{header.fpga_sw_version} {header.fpga_companion}".strip()),
+        ("FPGA", f"{format_fpga_label(base_run)} -> {format_fpga_label(run)}" if base_run else f"{header.fpga_sw_version} {header.fpga_companion}".strip()),
         ("MCU", header.mcu_sw_version),
         ("Tester", header.tester_version),
     ]
@@ -1210,8 +1274,11 @@ def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
     for idx, row in enumerate(rows):
         y_top = 1 - header_h - idx * row_h
         y = y_top - row_h
-        bg = "#FFFFFF" if idx % 2 == 0 else "#F8FAFC"
+        changed = row.note.startswith("was ") or row.note.startswith("new")
+        bg = "#FFF7E6" if changed else ("#FFFFFF" if idx % 2 == 0 else "#F8FAFC")
         ax.add_patch(Rectangle((0, y), 1, row_h, facecolor=bg, edgecolor="#E4E9EF", linewidth=0.45))
+        if changed:
+            ax.add_patch(Rectangle((0, y), 0.006, row_h, facecolor="#D99028", edgecolor="#D99028", linewidth=0))
         ax.text(0.02, y + row_h * 0.52, shorten(row.name.replace("test-", ""), 30), va="center", fontsize=6.45, color="#18222D")
         ax.text(0.49, y + row_h * 0.52, row.category, va="center", fontsize=6.1, color="#5C6875")
 
@@ -1221,26 +1288,56 @@ def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
         ax.text(0.81, y + row_h * 0.52, shorten(row.note, 22), va="center", fontsize=5.9, color="#47515D", clip_on=True)
 
 
-def render_brightness(ax: plt.Axes, brightness: BrightnessCurve | None) -> None:
+def render_brightness(
+    ax: plt.Axes,
+    brightness: BrightnessCurve | None,
+    base_brightness: BrightnessCurve | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
     style_chart(ax, "Brightness")
-    if brightness is None:
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if brightness is None and base_brightness is None:
         placeholder(ax, "Brightness data not available")
         return
-    x = brightness.brightness_percent
-    y = brightness.luminance
-    ax.plot(x, y, "o-", color="#0072B2", linewidth=1.4, markersize=2.6, label="measured")
-    if brightness.expected_luminance:
+    all_luminance: list[float] = []
+    if base_brightness is not None:
+        ax.plot(
+            base_brightness.brightness_percent,
+            base_brightness.luminance,
+            "o--",
+            color=BASELINE_COLOR,
+            markerfacecolor="white",
+            linewidth=1.1,
+            markersize=2.2,
+            label=labels.base,
+        )
+        all_luminance.extend(base_brightness.luminance)
+    if brightness is not None:
+        x = brightness.brightness_percent
+        y = brightness.luminance
+        ax.plot(x, y, "o-", color="#0072B2", linewidth=1.4, markersize=2.6, label=labels.run)
+        all_luminance.extend(y)
+    else:
+        x = []
+        y = []
+    if brightness is not None and brightness.expected_luminance and base_brightness is None:
         ax.plot(x, brightness.expected_luminance, "--", color="#6B7682", linewidth=1.0, label="expected")
     ax.set_xlabel("Brightness command (%)", fontsize=7)
     ax.set_ylabel("Luminance Y (nits)", fontsize=7)
     ax.set_xlim(-2, 102)
-    ax.set_ylim(bottom=0)
+    if all_luminance:
+        ax.set_ylim(0, max(all_luminance) * 1.08)
+    else:
+        ax.set_ylim(bottom=0)
     ax.legend(loc="upper left", fontsize=6, frameon=False)
     if y:
+        peak_text = f"Peak {max(y):.1f} nits"
+        if base_brightness and base_brightness.luminance:
+            peak_text += f" ({max(y) - max(base_brightness.luminance):+.1f})"
         ax.text(
             0.98,
             0.05,
-            f"Peak {max(y):.1f} nits",
+            peak_text,
             ha="right",
             transform=ax.transAxes,
             fontsize=7.2,
@@ -1249,26 +1346,47 @@ def render_brightness(ax: plt.Axes, brightness: BrightnessCurve | None) -> None:
         )
 
 
-def render_gamma(ax: plt.Axes, gamma: GammaCurve | None) -> None:
+def render_gamma(
+    ax: plt.Axes,
+    gamma: GammaCurve | None,
+    base_gamma: GammaCurve | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
     style_chart(ax, "Gamma")
-    if gamma is None:
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if gamma is None and base_gamma is None:
         placeholder(ax, "Gamma data not available")
         return
 
     ref_x = np.linspace(0, 1, 256)
     ax.plot(ref_x, ref_x**2.2, "--", color="#999999", linewidth=1.0, label="ref 2.2")
     ax.plot(ref_x, ref_x**2.4, ":", color="#666666", linewidth=1.0, label="ref 2.4")
-    if gamma.gamma is not None:
-        ax.plot(ref_x, ref_x**gamma.gamma, "-", color="#E69F00", linewidth=1.0, label=f"fit {gamma.gamma:.3f}")
-    ax.plot(
-        gamma.normalized_input,
-        gamma.normalized_luminance,
-        "o",
-        color="#0072B2",
-        markersize=2.4,
-        label="measured",
-        zorder=5,
-    )
+    if base_gamma is not None:
+        if base_gamma.gamma is not None:
+            ax.plot(ref_x, ref_x**base_gamma.gamma, "--", color=BASELINE_COLOR, linewidth=0.95, label=f"{labels.base} fit {base_gamma.gamma:.3f}")
+        ax.plot(
+            base_gamma.normalized_input,
+            base_gamma.normalized_luminance,
+            "o",
+            markerfacecolor="white",
+            markeredgecolor=BASELINE_COLOR,
+            markersize=2.2,
+            label=labels.base,
+            zorder=4,
+        )
+    if gamma is not None and gamma.gamma is not None:
+        run_fit_label = f"{labels.run} fit {gamma.gamma:.3f}" if base_gamma is not None else f"fit {gamma.gamma:.3f}"
+        ax.plot(ref_x, ref_x**gamma.gamma, "-", color="#E69F00", linewidth=1.0, label=run_fit_label)
+    if gamma is not None:
+        ax.plot(
+            gamma.normalized_input,
+            gamma.normalized_luminance,
+            "o",
+            color="#0072B2",
+            markersize=2.4,
+            label=labels.run,
+            zorder=5,
+        )
     ax.set_xlabel("Gray code / 255", fontsize=7)
     ax.set_ylabel("Normalized luminance", fontsize=7)
     ax.set_xlim(-0.02, 1.02)
@@ -1276,20 +1394,42 @@ def render_gamma(ax: plt.Axes, gamma: GammaCurve | None) -> None:
     ax.legend(loc="upper left", fontsize=5.8, frameon=False)
 
     details = []
-    if gamma.rms_gamma is not None:
+    if gamma and gamma.rms_gamma is not None:
         details.append(f"RMS {gamma.rms_gamma:.3f}")
-    details.append(f"Ymax {gamma.y_max:.1f}")
-    if gamma.endpoint_drift_percent is not None:
+    if gamma:
+        details.append(f"Ymax {gamma.y_max:.1f}")
+    if gamma and base_gamma and gamma.gamma is not None and base_gamma.gamma is not None:
+        details.append(f"dG {gamma.gamma - base_gamma.gamma:+.3f}")
+    if gamma and gamma.endpoint_drift_percent is not None:
         details.append(f"end {gamma.endpoint_drift_percent:+.1f}%")
-    ax.text(0.98, 0.05, " | ".join(details), ha="right", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
+    if details:
+        ax.text(0.98, 0.05, " | ".join(details), ha="right", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
 
 
-def render_contrast(ax: plt.Axes, contrast: ContrastCurve | None) -> None:
+def render_contrast(
+    ax: plt.Axes,
+    contrast: ContrastCurve | None,
+    base_contrast: ContrastCurve | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
     style_chart(ax, "Contrast")
-    if contrast is None:
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if contrast is None and base_contrast is None:
         placeholder(ax, "Contrast data not available")
         return
-    ax.plot(contrast.brightness, contrast.contrast_ratio, "o-", color="#009E73", linewidth=1.4, markersize=3.8)
+    if base_contrast is not None:
+        ax.plot(
+            base_contrast.brightness,
+            base_contrast.contrast_ratio,
+            "o--",
+            color=BASELINE_COLOR,
+            markerfacecolor="white",
+            linewidth=1.1,
+            markersize=3.1,
+            label=labels.base,
+        )
+    if contrast is not None:
+        ax.plot(contrast.brightness, contrast.contrast_ratio, "o-", color="#009E73", linewidth=1.4, markersize=3.8, label=labels.run)
     ax.set_xlabel("Brightness command (%)", fontsize=7)
     ax.set_ylabel("Contrast ratio", fontsize=7)
     ax.set_xlim(0, 105)
@@ -1297,109 +1437,154 @@ def render_contrast(ax: plt.Axes, contrast: ContrastCurve | None) -> None:
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=4))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:.0f}:1"))
     ax.yaxis.set_minor_formatter(NullFormatter())
-    for x, y, label, lower in zip(
-        contrast.brightness,
-        contrast.contrast_ratio,
-        contrast.contrast_display,
-        contrast.lower_bound,
-    ):
-        text = label if lower and label.startswith(">") else f"{y:.0f}"
-        ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 5), ha="center", fontsize=5.5)
-    missing = sorted(set(contrast.expected_levels) - set(contrast.brightness))
+    if contrast is not None:
+        for x, y, label, lower in zip(
+            contrast.brightness,
+            contrast.contrast_ratio,
+            contrast.contrast_display,
+            contrast.lower_bound,
+        ):
+            text = label if lower and label.startswith(">") else f"{y:.0f}"
+            ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 5), ha="center", fontsize=5.5)
+    missing = sorted(set(contrast.expected_levels) - set(contrast.brightness)) if contrast is not None else []
     note_parts = []
-    if any(contrast.lower_bound):
+    if contrast is not None and any(contrast.lower_bound):
         note_parts.append("lower bounds")
     if missing:
         note_parts.append("missing " + ", ".join(f"{level:g}%" for level in missing))
-    if contrast.result != "PASS":
+    if contrast is not None and contrast.result != "PASS":
         note_parts.append(contrast.result)
     if note_parts:
         ax.text(0.02, 0.94, "; ".join(note_parts), transform=ax.transAxes, fontsize=6.1, color="#C9342F", va="top")
+    if base_contrast is not None and contrast is not None:
+        ax.legend(loc="lower right", fontsize=5.7, frameon=False)
 
 
-def render_local_dimming_apl(ax: plt.Axes, apl: LocalDimmingAplCurve | None) -> None:
+def render_local_dimming_apl(
+    ax: plt.Axes,
+    apl: LocalDimmingAplCurve | None,
+    base_apl: LocalDimmingAplCurve | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
     style_chart(ax, "Peak luminance vs window size (backlight 100%)")
-    if apl is None:
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if apl is None and base_apl is None:
         placeholder(ax, "No APL data in this run")
         return
 
-    measured = [sample for sample in apl.samples if sample.fits_screen and sample.luminance is not None]
-    skipped = [sample for sample in apl.samples if not sample.fits_screen]
-    all_apl = sorted({sample.apl_percent for sample in apl.samples})
+    measured = [sample for sample in apl.samples if sample.fits_screen and sample.luminance is not None] if apl else []
+    skipped = [sample for sample in apl.samples if not sample.fits_screen] if apl else []
+    base_measured = [sample for sample in base_apl.samples if sample.fits_screen and sample.luminance is not None] if base_apl else []
+    base_skipped = [sample for sample in base_apl.samples if not sample.fits_screen] if base_apl else []
+    all_apl = sorted(
+        {sample.apl_percent for sample in measured + skipped + base_measured + base_skipped}
+    )
 
     if all_apl:
         ax.set_xlim(max(0.0, min(all_apl) - 1.0), max(all_apl) + 2.0)
         ax.set_xticks(all_apl)
         ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:g}"))
 
-    if not measured:
-        if skipped:
-            ax.scatter(
-                [sample.apl_percent for sample in skipped],
-                [0.0 for _sample in skipped],
-                facecolors="none",
-                edgecolors="#8C96A3",
-                s=22,
-                linewidths=0.9,
-                label="skipped",
-            )
+    all_measured_y = [float(sample.luminance) for sample in measured + base_measured if sample.luminance is not None]
+    if not all_measured_y:
+        for samples, marker, color, label in (
+            (base_skipped, "^", BASELINE_COLOR, labels.base),
+            (skipped, "o", "#8C96A3", "skipped"),
+        ):
+            if samples:
+                ax.scatter(
+                    [sample.apl_percent for sample in samples],
+                    [0.0 for _sample in samples],
+                    marker=marker,
+                    facecolors="none",
+                    edgecolors=color,
+                    s=22,
+                    linewidths=0.9,
+                    label=label,
+                )
         ax.set_ylim(0, 1)
         placeholder(ax, "No measurable APL samples")
         return
 
-    measured = sorted(measured, key=lambda sample: sample.index)
-    measured_x = [sample.apl_percent for sample in measured]
-    measured_y = [float(sample.luminance) for sample in measured if sample.luminance is not None]
-    ax.plot(measured_x, measured_y, "o-", color="#A23E48", linewidth=1.35, markersize=3.0, label="measured")
-
-    y_min = min(measured_y)
-    y_max = max(measured_y)
+    y_min = min(all_measured_y)
+    y_max = max(all_measured_y)
     y_span = max(y_max - y_min, 1.0)
     y_bottom = max(0.0, y_min - max(y_span * 0.12, y_max * 0.05, 1.0))
     y_top = y_max + max(y_span * 0.12, y_max * 0.04, 1.0)
     ax.set_ylim(y_bottom, y_top)
 
-    if skipped:
-        marker_y = y_bottom + (y_top - y_bottom) * 0.055
-        for sample in skipped:
-            ax.axvline(sample.apl_percent, color="#D0D7DF", linestyle="--", linewidth=0.65, zorder=0)
-        ax.scatter(
-            [sample.apl_percent for sample in skipped],
-            [marker_y for _sample in skipped],
-            facecolors="white",
-            edgecolors="#8C96A3",
-            s=24,
-            linewidths=0.9,
-            label="skipped",
-            zorder=5,
+    if base_measured:
+        base_measured = sorted(base_measured, key=lambda sample: sample.index)
+        ax.plot(
+            [sample.apl_percent for sample in base_measured],
+            [float(sample.luminance) for sample in base_measured if sample.luminance is not None],
+            "o--",
+            color=BASELINE_COLOR,
+            markerfacecolor="white",
+            linewidth=1.1,
+            markersize=2.8,
+            label=labels.base,
         )
 
-    peak = max(measured, key=lambda sample: float(sample.luminance or -math.inf))
-    ratio = y_max / y_min if y_min > 0 else None
-    attempted = apl.samples_attempted if apl.samples_attempted is not None else len(apl.samples)
-    collected = apl.samples_collected if apl.samples_collected is not None else len(measured)
-    badge_parts = [
-        f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}%",
-        f"{collected}/{attempted} measured",
-    ]
-    if ratio is not None:
-        badge_parts.insert(1, f"ratio {ratio:.2f}x")
-    if apl.artifact_generated_timestamp:
-        badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
-    ax.text(
-        0.985,
-        0.235,
-        " | ".join(badge_parts),
-        transform=ax.transAxes,
-        fontsize=5.8,
-        color="#3D4650",
-        ha="right",
-        va="top",
-        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.3},
-    )
+    if measured:
+        measured = sorted(measured, key=lambda sample: sample.index)
+        measured_x = [sample.apl_percent for sample in measured]
+        measured_y = [float(sample.luminance) for sample in measured if sample.luminance is not None]
+        ax.plot(measured_x, measured_y, "o-", color="#A23E48", linewidth=1.35, markersize=3.0, label=labels.run)
+    else:
+        measured_y = []
 
-    if apl.display_model:
-        ax.text(0.015, 0.90, shorten(apl.display_model, 34), transform=ax.transAxes, fontsize=5.8, color="#5E6874", va="top")
+    marker_y = y_bottom + (y_top - y_bottom) * 0.055
+    for samples, marker, color, label, zorder in (
+        (base_skipped, "^", BASELINE_COLOR, "base skipped", 4),
+        (skipped, "o", "#8C96A3", "skipped", 5),
+    ):
+        if samples:
+            for sample in samples:
+                ax.axvline(sample.apl_percent, color="#D0D7DF", linestyle="--", linewidth=0.65, zorder=0)
+            ax.scatter(
+                [sample.apl_percent for sample in samples],
+                [marker_y for _sample in samples],
+                marker=marker,
+                facecolors="white",
+                edgecolors=color,
+                s=22,
+                linewidths=0.9,
+                label=label,
+                zorder=zorder,
+            )
+
+    if measured:
+        peak = max(measured, key=lambda sample: float(sample.luminance or -math.inf))
+        ratio = max(measured_y) / min(measured_y) if min(measured_y) > 0 else None
+        attempted = apl.samples_attempted if apl and apl.samples_attempted is not None else len(apl.samples) if apl else len(measured)
+        collected = apl.samples_collected if apl and apl.samples_collected is not None else len(measured)
+        badge_parts = [
+            f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}%",
+            f"{collected}/{attempted} measured",
+        ]
+        if ratio is not None:
+            badge_parts.insert(1, f"ratio {ratio:.2f}x")
+        if base_measured:
+            base_peak = max(base_measured, key=lambda sample: float(sample.luminance or -math.inf))
+            badge_parts.append(f"dPeak {float(peak.luminance or 0.0) - float(base_peak.luminance or 0.0):+.1f}")
+        if apl and apl.artifact_generated_timestamp:
+            badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
+        ax.text(
+            0.985,
+            0.235,
+            " | ".join(badge_parts),
+            transform=ax.transAxes,
+            fontsize=5.8,
+            color="#3D4650",
+            ha="right",
+            va="top",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.3},
+        )
+
+    display_model = apl.display_model if apl and apl.display_model else base_apl.display_model if base_apl else ""
+    if display_model:
+        ax.text(0.015, 0.90, shorten(display_model, 34), transform=ax.transAxes, fontsize=5.8, color="#5E6874", va="top")
     skip_note = summarize_apl_skips(skipped)
     if skip_note:
         ax.text(0.015, 0.74, f"skipped: {skip_note}", transform=ax.transAxes, fontsize=5.5, color="#7A4F00", va="top")
@@ -1441,8 +1626,11 @@ def render_gamut(
     reference_gamut: str,
     render_mode: str,
     warnings: list[str],
+    base_gamut: GamutMetrics | None = None,
+    labels: SeriesLabels | None = None,
 ) -> None:
     style_chart(ax, "Gamut / White Point")
+    labels = labels or SeriesLabels(run="measured", base="base")
     reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["ntsc"])
     if render_mode == "advanced":
         render_advanced_chromaticity_background(ax, warnings)
@@ -1464,15 +1652,39 @@ def render_gamut(
         )
     )
 
-    if gamut is None:
+    if gamut is None and base_gamut is None:
         placeholder(ax, "Gamut data not available")
+        return
+
+    if base_gamut is not None and all(color in base_gamut.points for color in ("R", "G", "B")):
+        base_measured = [base_gamut.points["R"], base_gamut.points["G"], base_gamut.points["B"], base_gamut.points["R"]]
+        ax.plot(
+            [p[0] for p in base_measured],
+            [p[1] for p in base_measured],
+            "o--",
+            color=BASELINE_COLOR,
+            markerfacecolor="white",
+            linewidth=1.0,
+            markersize=3.0,
+            label=labels.base,
+        )
+    if base_gamut is not None and base_gamut.white_point:
+        ax.plot(base_gamut.white_point[0], base_gamut.white_point[1], "o", markerfacecolor="white", markeredgecolor=BASELINE_COLOR, markersize=3.0, label="base white")
+
+    if gamut is None:
+        ax.set_xlabel("CIE x", fontsize=7)
+        ax.set_ylabel("CIE y", fontsize=7)
+        ax.set_xlim(0.0, 0.78)
+        ax.set_ylim(0.0, 0.82)
+        ax.legend(loc="upper right", fontsize=5.7, frameon=False)
         return
 
     if all(color in gamut.points for color in ("R", "G", "B")):
         measured = [gamut.points["R"], gamut.points["G"], gamut.points["B"], gamut.points["R"]]
-        ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label="measured")
+        ax.plot([p[0] for p in measured], [p[1] for p in measured], "o-", color="#D55E00", linewidth=1.3, markersize=3.5, label=labels.run)
     if gamut.white_point:
-        ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=3.0, label="white")
+        white_label = f"{labels.run} white" if base_gamut is not None else "white"
+        ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=3.0, label=white_label)
         coverage_parts = []
         white_parts = []
         if gamut.coverage_percent is not None:
@@ -1556,17 +1768,19 @@ def placeholder(ax: plt.Axes, message: str) -> None:
     ax.set_yticks([])
 
 
-def render_footer(ax: plt.Axes, run: RunData) -> None:
+def render_footer(ax: plt.Axes, run: RunData, base_run: RunData | None = None) -> None:
     ax.axis("off")
     ax.add_patch(Rectangle((0, 0), 1, 1, transform=ax.transAxes, facecolor="#F8FAFC", edgecolor="#D9E0E7", linewidth=0.8))
-    observations = build_observations(run)
+    observations = build_observations(run, base_run)
     ax.text(0.012, 0.68, "Observations", fontsize=8.2, weight="bold", color="#2D3845", transform=ax.transAxes)
     ax.text(0.012, 0.28, "  |  ".join(observations), fontsize=7.2, color="#4D5966", transform=ax.transAxes)
     if run.warnings:
         ax.text(0.988, 0.28, f"{len(run.warnings)} warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
 
 
-def build_observations(run: RunData) -> list[str]:
+def build_observations(run: RunData, base_run: RunData | None = None) -> list[str]:
+    if base_run is not None:
+        return build_comparison_observations(run, base_run)
     notes: list[str] = []
     failed_or_error = [row for row in run.status_rows if row.result in {"FAIL", "ERROR"}]
     skipped = [row for row in run.status_rows if row.result == "SKIP"]
@@ -1594,14 +1808,84 @@ def build_observations(run: RunData) -> list[str]:
     return [shorten(note, 78) for note in notes[:5]]
 
 
-def default_output_path(run: RunData) -> Path:
-    filename = f"{run.header.run_id}-report-card.png"
+def build_comparison_observations(run: RunData, base_run: RunData) -> list[str]:
+    notes: list[str] = []
+    changes = result_changes(run, base_run)
+    if changes:
+        notes.append("; ".join(changes[:2]) + (f"; +{len(changes) - 2} more" if len(changes) > 2 else ""))
+    else:
+        notes.append("No test result changes")
+
+    brightness_delta = scalar_delta(max_luminance(run.brightness), max_luminance(base_run.brightness), "nits", 1)
+    if brightness_delta:
+        notes.append(f"Peak brightness {brightness_delta}")
+
+    if run.gamma and base_run.gamma and run.gamma.gamma is not None and base_run.gamma.gamma is not None:
+        notes.append(f"Gamma {run.gamma.gamma:.3f} ({run.gamma.gamma - base_run.gamma.gamma:+.3f})")
+
+    gamut_delta = scalar_delta(
+        run.gamut.coverage_percent if run.gamut else None,
+        base_run.gamut.coverage_percent if base_run.gamut else None,
+        "%",
+        1,
+    )
+    if gamut_delta and run.gamut:
+        notes.append(f"{run.gamut.reference_name} coverage {run.gamut.coverage_percent:.1f}% ({gamut_delta})")
+
+    apl_delta = scalar_delta(apl_peak_luminance(run.local_dimming_apl), apl_peak_luminance(base_run.local_dimming_apl), "cd/m2", 1)
+    if apl_delta:
+        notes.append(f"APL peak {apl_peak_luminance(run.local_dimming_apl):.1f} ({apl_delta})")
+    return [shorten(note, 78) for note in notes[:5]]
+
+
+def result_changes(run: RunData, base_run: RunData) -> list[str]:
+    base_rows = {row.name: row for row in base_run.status_rows}
+    changes: list[str] = []
+    for row in run.status_rows:
+        base_row = base_rows.get(row.name)
+        if base_row is None:
+            changes.append(f"{row.name}: new {row.result}")
+        elif base_row.result != row.result:
+            changes.append(f"{row.name}: {base_row.result}->{row.result}")
+    return changes
+
+
+def max_luminance(brightness: BrightnessCurve | None) -> float | None:
+    if brightness is None or not brightness.luminance:
+        return None
+    return max(brightness.luminance)
+
+
+def apl_peak_luminance(apl: LocalDimmingAplCurve | None) -> float | None:
+    if apl is None:
+        return None
+    measured = [sample.luminance for sample in apl.samples if sample.fits_screen and sample.luminance is not None]
+    if not measured:
+        return None
+    return max(float(value) for value in measured)
+
+
+def scalar_delta(run_value: float | None, base_value: float | None, unit: str, precision: int) -> str | None:
+    if run_value is None or base_value is None:
+        return None
+    delta = run_value - base_value
+    if unit == "%":
+        return f"{delta:+.{precision}f}%"
+    return f"{delta:+.{precision}f} {unit}".rstrip()
+
+
+def default_output_path(run: RunData, base_run: RunData | None = None) -> Path:
+    if base_run is not None:
+        filename = f"{safe_filename(base_run.header.run_id)}-vs-{safe_filename(run.header.run_id)}-report-card.png"
+        return Path(filename)
+    filename = f"{safe_filename(run.header.run_id)}-report-card.png"
     return Path(filename)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a display test report card PNG.")
     parser.add_argument("--input", required=True, type=Path, help="Input display test result folder.")
+    parser.add_argument("--base-input", type=Path, default=None, help="Optional baseline result folder for curve comparison.")
     parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
     parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="ntsc")
     parser.add_argument("--render", choices=["basic", "advanced"], default="basic", help="Gamut rendering mode.")
@@ -1616,14 +1900,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     try:
         run = load_run_folder(args.input, args)
+        base_run = load_run_folder(args.base_input, args) if args.base_input else None
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    output = args.output or default_output_path(run)
-    render_report_card(run, output, args.title, args.dpi, args.reference_gamut, args.render)
+    output = args.output or default_output_path(run, base_run)
+    render_report_card(run, output, args.title, args.dpi, args.reference_gamut, args.render, base_run)
+    if base_run:
+        for warning in base_run.warnings:
+            print(f"warning(base): {warning}", file=sys.stderr)
     for warning in run.warnings:
-        print(f"warning: {warning}", file=sys.stderr)
+        print(f"warning(run): {warning}", file=sys.stderr)
     print(f"wrote {output}")
     return 0
 
