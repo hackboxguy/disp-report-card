@@ -1130,10 +1130,15 @@ def format_fpga_label(run: RunData) -> str:
     return label or shorten(run.header.run_id, 18)
 
 
-def series_labels(run: RunData, base_run: RunData | None) -> SeriesLabels:
+def series_labels(
+    run: RunData,
+    base_run: RunData | None,
+    run_label: str | None = None,
+    base_label: str | None = None,
+) -> SeriesLabels:
     return SeriesLabels(
-        run=f"run {format_fpga_label(run)}" if base_run else "measured",
-        base=f"base {format_fpga_label(base_run)}" if base_run else "base",
+        run=run_label or (f"run {format_fpga_label(run)}" if base_run else "measured"),
+        base=base_label or (f"base {format_fpga_label(base_run)}" if base_run else "base"),
     )
 
 
@@ -1145,6 +1150,8 @@ def render_report_card(
     reference_gamut: str,
     render_mode: str,
     base_run: RunData | None = None,
+    run_label: str | None = None,
+    base_label: str | None = None,
 ) -> None:
     fig = plt.figure(figsize=A4_LANDSCAPE_INCHES, dpi=dpi, facecolor="white")
     grid = fig.add_gridspec(
@@ -1171,7 +1178,7 @@ def render_report_card(
     ax_local_dimming_apl = fig.add_subplot(chart_grid[2, :])
     ax_footer = fig.add_subplot(grid[3, :])
 
-    labels = series_labels(run, base_run)
+    labels = series_labels(run, base_run, run_label, base_label)
     render_header(ax_header, run, title, base_run)
     render_kpis(ax_kpi, run)
     render_status_matrix(ax_matrix, comparison_status_rows(run, base_run))
@@ -1536,7 +1543,7 @@ def render_local_dimming_apl(
 
     marker_y = y_bottom + (y_top - y_bottom) * 0.055
     for samples, marker, color, label, zorder in (
-        (base_skipped, "^", BASELINE_COLOR, "base skipped", 4),
+        (base_skipped, "^", BASELINE_COLOR, f"{labels.base} skipped", 4),
         (skipped, "o", "#8C96A3", "skipped", 5),
     ):
         if samples:
@@ -1669,7 +1676,15 @@ def render_gamut(
             label=labels.base,
         )
     if base_gamut is not None and base_gamut.white_point:
-        ax.plot(base_gamut.white_point[0], base_gamut.white_point[1], "o", markerfacecolor="white", markeredgecolor=BASELINE_COLOR, markersize=3.0, label="base white")
+        ax.plot(
+            base_gamut.white_point[0],
+            base_gamut.white_point[1],
+            "o",
+            markerfacecolor="white",
+            markeredgecolor=BASELINE_COLOR,
+            markersize=3.0,
+            label=f"{labels.base} white",
+        )
 
     if gamut is None:
         ax.set_xlabel("CIE x", fontsize=7)
@@ -1886,6 +1901,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a display test report card PNG.")
     parser.add_argument("--input", required=True, type=Path, help="Input display test result folder.")
     parser.add_argument("--base-input", type=Path, default=None, help="Optional baseline result folder for curve comparison.")
+    parser.add_argument("--base-label", default=None, help="Override baseline chart label in comparison mode.")
+    parser.add_argument("--run-label", default=None, help="Override current-run chart label in comparison mode.")
     parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
     parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="ntsc")
     parser.add_argument("--render", choices=["basic", "advanced"], default="basic", help="Gamut rendering mode.")
@@ -1906,7 +1923,17 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output = args.output or default_output_path(run, base_run)
-    render_report_card(run, output, args.title, args.dpi, args.reference_gamut, args.render, base_run)
+    render_report_card(
+        run,
+        output,
+        args.title,
+        args.dpi,
+        args.reference_gamut,
+        args.render,
+        base_run,
+        args.run_label,
+        args.base_label,
+    )
     if base_run:
         for warning in base_run.warnings:
             print(f"warning(base): {warning}", file=sys.stderr)

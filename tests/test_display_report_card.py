@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.display_report_card import comparison_status_rows, format_fpga_label, load_run_folder, render_report_card
+from src.display_report_card import (
+    comparison_status_rows,
+    format_fpga_label,
+    load_run_folder,
+    render_report_card,
+    series_labels,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -307,6 +313,8 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
             self.assertEqual(format_fpga_label(base), "v02 Apr 9")
             self.assertEqual(format_fpga_label(run), "v03 Apr 29")
+            self.assertEqual(series_labels(run, base, "v03", "v02").run, "v03")
+            self.assertEqual(series_labels(run, base, "v03", "v02").base, "v02")
             self.assertEqual(changed.note, "was ERROR; 150/150 ops ok")
             self.assertTrue(output.exists())
 

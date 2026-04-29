@@ -67,6 +67,7 @@ Options:
 
 - `--input` - required result folder.
 - `--base-input` - optional baseline result folder; when provided, report charts overlay baseline and run curves.
+- `--base-label` / `--run-label` - optional chart legend labels for comparison mode.
 - `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
 - `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`; default is `ntsc`.
 - `--render` - `basic` by default, or `advanced` for an optional CIE chromaticity background when `colour-science` is installed.
@@ -91,9 +92,13 @@ python3 src/display_report_card.py \
 
 make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03 \
   OUT=out/12-3-v02-v03-compare.png
+
+make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03 \
+  BASE_LABEL=v02 RUN_LABEL=v03 OUT=out/12-3-v02-v03-compare.png
 ```
 
-The test matrix remains run-focused and highlights result changes from the baseline.
+The test matrix remains run-focused and highlights result changes from the baseline. If labels are
+not supplied, comparison charts use FPGA labels derived from `test-version-read`.
 
 ## Verification
 

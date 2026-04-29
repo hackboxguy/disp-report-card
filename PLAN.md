@@ -16,6 +16,7 @@
 - Done: consume the structured 81-step brightness calibration artifact when it is present.
 - Done: consume and render the local-dimming APL sweep artifact when it is present.
 - Done: add comparison mode for baseline/run overlays and changed-test highlighting.
+- Done: add comparison label overrides for concise firmware labels in plots.
 - Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata

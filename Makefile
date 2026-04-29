@@ -2,6 +2,7 @@ PYTHON ?= python3
 REPORT := src/display_report_card.py
 PYTHON_CACHE_DIRS := src/__pycache__ tests/__pycache__
 OUT ?= out/compare-report-card.png
+LABEL_ARGS := $(if $(BASE_LABEL),--base-label "$(BASE_LABEL)") $(if $(RUN_LABEL),--run-label "$(RUN_LABEL)")
 
 .PHONY: test report-samples report-samples-advanced compare clean distclean
 
@@ -24,7 +25,7 @@ report-samples-advanced:
 
 compare:
 	mkdir -p out
-	$(PYTHON) $(REPORT) --base-input $(BASE) --input $(RUN) --output $(OUT)
+	$(PYTHON) $(REPORT) --base-input $(BASE) --input $(RUN) --output $(OUT) $(LABEL_ARGS)
 
 clean:
 	rm -rf out build dist *.egg-info src/*.egg-info $(PYTHON_CACHE_DIRS)
