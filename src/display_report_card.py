@@ -1873,8 +1873,8 @@ def plot_thermal_profile(
             arrowprops={"arrowstyle": "->", "color": color, "linewidth": 0.7, "shrinkA": 4, "shrinkB": 4},
             zorder=5,
         )
-        add_thermal_point_label(ax, "start", start, xybox=(-2, -2), box_alignment=(1.0, 1.0), temp_color="#0072B2")
-        add_thermal_point_label(ax, "end", end, xybox=(3, 3), box_alignment=(0.0, 0.0), temp_color="#C9342F")
+        add_thermal_point_label(ax, "start", start, xybox=(2, 2), box_alignment=(0.0, 0.0), temp_color="#0072B2")
+        add_thermal_point_label(ax, "end", end, xybox=(-2, -2), box_alignment=(1.0, 1.0), temp_color="#C9342F")
 
 
 def add_thermal_point_label(
