@@ -24,6 +24,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.offsetbox import AnnotationBbox, HPacker, TextArea
 from matplotlib.patches import Ellipse, Rectangle
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 import numpy as np
@@ -1872,36 +1873,38 @@ def plot_thermal_profile(
             arrowprops={"arrowstyle": "->", "color": color, "linewidth": 0.7, "shrinkA": 4, "shrinkB": 4},
             zorder=5,
         )
-        ax.annotate(
-            thermal_point_label("start", start),
-            (start.x_chromaticity, start.y_chromaticity),
-            textcoords="offset points",
-            xytext=(4, 4),
-            fontsize=5.2,
-            color="#3D4650",
-            ha="left",
-            va="bottom",
-            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
-        )
-        ax.annotate(
-            thermal_point_label("end", end),
-            (end.x_chromaticity, end.y_chromaticity),
-            textcoords="offset points",
-            xytext=(-4, -4),
-            fontsize=5.2,
-            color="#3D4650",
-            ha="right",
-            va="top",
-            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
-        )
+        add_thermal_point_label(ax, "start", start, xybox=(-2, -2), box_alignment=(1.0, 1.0), temp_color="#0072B2")
+        add_thermal_point_label(ax, "end", end, xybox=(3, 3), box_alignment=(0.0, 0.0), temp_color="#C9342F")
 
 
-def thermal_point_label(prefix: str, sample: ThermalLuminanceSample) -> str:
-    parts = [prefix]
+def add_thermal_point_label(
+    ax: plt.Axes,
+    prefix: str,
+    sample: ThermalLuminanceSample,
+    xybox: tuple[float, float],
+    box_alignment: tuple[float, float],
+    temp_color: str,
+) -> None:
+    textprops = {"fontsize": 5.2, "color": "#3D4650"}
+    parts = [TextArea(f"{prefix} ", textprops=textprops)]
     if sample.backlight_temp_c is not None:
-        parts.append(f"{sample.backlight_temp_c:.1f}C")
-    parts.append(f"{sample.luminance:.0f}Y")
-    return " ".join(parts)
+        parts.append(TextArea(f"{sample.backlight_temp_c:.1f}C", textprops={"fontsize": 5.2, "color": temp_color}))
+        parts.append(TextArea(f" {sample.luminance:.0f}Y", textprops=textprops))
+    else:
+        parts.append(TextArea(f"{sample.luminance:.0f}Y", textprops=textprops))
+    packed = HPacker(children=parts, align="center", pad=0, sep=0)
+    label = AnnotationBbox(
+        packed,
+        (sample.x_chromaticity, sample.y_chromaticity),
+        xybox=xybox,
+        xycoords="data",
+        boxcoords="offset points",
+        box_alignment=box_alignment,
+        frameon=True,
+        bboxprops={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "boxstyle": "round,pad=0.08"},
+    )
+    label.set_zorder(7)
+    ax.add_artist(label)
 
 
 def add_thermal_summary_badge(
