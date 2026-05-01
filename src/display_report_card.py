@@ -1778,6 +1778,7 @@ def render_thermal_white_point_drift(
 
     summary_profile = profile or base_profile
     if summary_profile is not None:
+        add_thermal_runtime_badge(ax, summary_profile)
         add_thermal_summary_badge(ax, summary_profile, reference_white)
 
 
@@ -1940,6 +1941,54 @@ def add_thermal_summary_badge(
         linespacing=1.15,
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.1},
     )
+
+
+def add_thermal_runtime_badge(ax: plt.Axes, profile: ThermalLuminanceProfile) -> None:
+    minutes = thermal_duration_minutes(profile)
+    if minutes is None:
+        return
+    ax.text(
+        0.985,
+        0.935,
+        f"runtime {minutes:.1f} min",
+        transform=ax.transAxes,
+        fontsize=5.4,
+        color="#4D5966",
+        ha="right",
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.76, "pad": 1.0},
+    )
+
+
+def thermal_duration_minutes(profile: ThermalLuminanceProfile) -> float | None:
+    if len(profile.samples) < 2:
+        return None
+    start = profile.samples[0]
+    end = profile.samples[-1]
+    if start.elapsed_seconds is not None and end.elapsed_seconds is not None:
+        seconds = end.elapsed_seconds - start.elapsed_seconds
+        if seconds >= 0:
+            return seconds / 60.0
+    start_time = parse_iso_datetime(start.timestamp)
+    end_time = parse_iso_datetime(end.timestamp)
+    if start_time is None or end_time is None:
+        return None
+    try:
+        seconds = (end_time - start_time).total_seconds()
+    except TypeError:
+        return None
+    if seconds < 0:
+        return None
+    return seconds / 60.0
+
+
+def parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def xy_distance(a: tuple[float, float], b: tuple[float, float]) -> float:

@@ -10,6 +10,7 @@ from src.display_report_card import (
     load_run_folder,
     render_report_card,
     series_labels,
+    thermal_duration_minutes,
 )
 
 
@@ -324,6 +325,7 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
             self.assertEqual(run.thermal_profile.metadata["record_interval_seconds"], "30.0")
             self.assertEqual(len(run.thermal_profile.samples), 2)
             self.assertAlmostEqual(run.thermal_profile.samples[-1].backlight_temp_c, 55.3)
+            self.assertAlmostEqual(thermal_duration_minutes(run.thermal_profile), 64.08666666666667)
             self.assertTrue(output.exists())
 
     def test_comparison_mode_highlights_result_changes_and_renders(self) -> None:
