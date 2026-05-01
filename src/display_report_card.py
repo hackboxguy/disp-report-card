@@ -1768,7 +1768,6 @@ def render_thermal_white_point_drift(
     if profile is not None:
         plot_thermal_profile(ax, profile, labels.run, "#A23E48", baseline=False)
 
-    draw_ntsc_context_inset(ax, reference, reference_white, (x_min, x_max, y_min, y_max))
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
     ax.set_aspect("auto", adjustable="box")
@@ -1839,13 +1838,13 @@ def plot_thermal_profile(
             "o--",
             color=color,
             markerfacecolor="white",
-            linewidth=1.0,
-            markersize=2.6,
+            linewidth=0.8,
+            markersize=2.2,
             label=label,
             zorder=3,
         )
     else:
-        ax.plot(x_values, y_values, "-", color=color, linewidth=1.05, alpha=0.8, label=label, zorder=3)
+        ax.plot(x_values, y_values, "-", color=color, linewidth=0.8, alpha=0.8, label=label, zorder=3)
         temps = [sample.backlight_temp_c if sample.backlight_temp_c is not None else math.nan for sample in samples]
         finite_temps = [temp for temp in temps if not math.isnan(temp)]
         if finite_temps:
@@ -1854,23 +1853,23 @@ def plot_thermal_profile(
                 y_values,
                 c=temps,
                 cmap="coolwarm",
-                s=10,
+                s=7,
                 edgecolors="none",
                 zorder=4,
             )
         else:
-            ax.scatter(x_values, y_values, color=color, s=10, edgecolors="none", zorder=4)
+            ax.scatter(x_values, y_values, color=color, s=7, edgecolors="none", zorder=4)
 
     start = samples[0]
     end = samples[-1]
-    ax.plot(start.x_chromaticity, start.y_chromaticity, "o", color=color, markerfacecolor="white" if baseline else color, markersize=4.2, zorder=6)
-    ax.plot(end.x_chromaticity, end.y_chromaticity, "s", color=color, markerfacecolor="white" if baseline else color, markersize=4.0, zorder=6)
+    ax.plot(start.x_chromaticity, start.y_chromaticity, "o", color=color, markerfacecolor="white" if baseline else color, markersize=3.0, zorder=6)
+    ax.plot(end.x_chromaticity, end.y_chromaticity, "s", color=color, markerfacecolor="white" if baseline else color, markersize=3.0, zorder=6)
     if not baseline:
         ax.annotate(
             "",
             xy=(end.x_chromaticity, end.y_chromaticity),
             xytext=(start.x_chromaticity, start.y_chromaticity),
-            arrowprops={"arrowstyle": "->", "color": color, "linewidth": 0.9, "shrinkA": 5, "shrinkB": 5},
+            arrowprops={"arrowstyle": "->", "color": color, "linewidth": 0.7, "shrinkA": 4, "shrinkB": 4},
             zorder=5,
         )
         ax.annotate(
@@ -1899,37 +1898,6 @@ def thermal_point_label(prefix: str, sample: ThermalLuminanceSample) -> str:
         parts.append(f"{sample.backlight_temp_c:.1f}C")
     parts.append(f"{sample.luminance:.0f}Y")
     return " ".join(parts)
-
-
-def draw_ntsc_context_inset(
-    ax: plt.Axes,
-    reference: dict[str, Any],
-    reference_white: tuple[float, float],
-    zoom_limits: tuple[float, float, float, float],
-) -> None:
-    inset = ax.inset_axes([0.69, 0.57, 0.27, 0.35])
-    ref_triangle = [reference["r"], reference["g"], reference["b"], reference["r"]]
-    inset.plot([p[0] for p in ref_triangle], [p[1] for p in ref_triangle], "--", color="#9AA4AF", linewidth=0.7)
-    inset.plot(reference_white[0], reference_white[1], "x", color="#4F5965", markersize=3.0)
-    x_min, x_max, y_min, y_max = zoom_limits
-    inset.add_patch(
-        Rectangle(
-            (x_min, y_min),
-            x_max - x_min,
-            y_max - y_min,
-            fill=False,
-            edgecolor="#A23E48",
-            linewidth=0.7,
-        )
-    )
-    inset.set_xlim(0.0, 0.78)
-    inset.set_ylim(0.0, 0.82)
-    inset.set_xticks([])
-    inset.set_yticks([])
-    inset.set_title("NTSC", fontsize=4.8, pad=1)
-    for spine in inset.spines.values():
-        spine.set_color("#D4DAE1")
-        spine.set_linewidth(0.5)
 
 
 def add_thermal_summary_badge(
