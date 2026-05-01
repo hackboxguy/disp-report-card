@@ -1930,7 +1930,7 @@ def add_thermal_summary_badge(
     )
     ax.text(
         0.985,
-        0.055,
+        0.025,
         badge,
         transform=ax.transAxes,
         fontsize=5.35,
