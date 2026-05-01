@@ -1771,7 +1771,7 @@ def render_thermal_white_point_drift(
     draw_ntsc_context_inset(ax, reference, reference_white, (x_min, x_max, y_min, y_max))
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
-    ax.set_aspect("equal", adjustable="box")
+    ax.set_aspect("auto", adjustable="box")
     ax.set_xlabel("CIE x", fontsize=6.4)
     ax.set_ylabel("CIE y", fontsize=6.4)
     ax.legend(loc="upper left", fontsize=5.4, frameon=False)
