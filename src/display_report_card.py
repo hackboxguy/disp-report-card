@@ -1816,7 +1816,7 @@ def thermal_zoom_limits(
     y_max = max(y_candidates)
     span = max(x_max - x_min, y_max - y_min, 0.020)
     pad = max(span * 0.18, 0.004)
-    return x_min - pad, x_max + pad, y_min - pad, y_max + pad
+    return x_min - pad * 1.8, x_max + pad * 0.5, y_min - pad, y_max + pad
 
 
 def plot_thermal_profile(
@@ -1876,18 +1876,22 @@ def plot_thermal_profile(
             thermal_point_label("start", start),
             (start.x_chromaticity, start.y_chromaticity),
             textcoords="offset points",
-            xytext=(5, 8),
+            xytext=(4, 4),
             fontsize=5.2,
             color="#3D4650",
+            ha="left",
+            va="bottom",
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
         )
         ax.annotate(
             thermal_point_label("end", end),
             (end.x_chromaticity, end.y_chromaticity),
             textcoords="offset points",
-            xytext=(5, 8),
+            xytext=(-4, -4),
             fontsize=5.2,
             color="#3D4650",
+            ha="right",
+            va="top",
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
         )
 
@@ -1909,26 +1913,26 @@ def add_thermal_summary_badge(
         return
     start = profile.samples[0]
     end = profile.samples[-1]
-    temp_text = "temp n/a"
+    temp_text = "T n/a"
     if start.backlight_temp_c is not None and end.backlight_temp_c is not None:
-        temp_text = f"{start.backlight_temp_c:.1f}->{end.backlight_temp_c:.1f}C"
+        temp_text = f"T {start.backlight_temp_c:.1f}->{end.backlight_temp_c:.1f}C"
     y_delta = end.luminance - start.luminance
     y_delta_percent = y_delta / start.luminance * 100.0 if start.luminance else 0.0
     d65_start = xy_distance((start.x_chromaticity, start.y_chromaticity), reference_white)
     d65_end = xy_distance((end.x_chromaticity, end.y_chromaticity), reference_white)
     drift = xy_distance((start.x_chromaticity, start.y_chromaticity), (end.x_chromaticity, end.y_chromaticity))
     badge = (
-        f"{temp_text} | Y {start.luminance:.0f}->{end.luminance:.0f} ({y_delta_percent:+.1f}%)\n"
+        f"{temp_text} | Y {y_delta_percent:+.1f}%\n"
         f"dD65 {d65_start:.4f}->{d65_end:.4f} | drift {drift:.4f} xy"
     )
     ax.text(
-        0.02,
+        0.985,
         0.055,
         badge,
         transform=ax.transAxes,
         fontsize=5.35,
         color="#3D4650",
-        ha="left",
+        ha="right",
         va="bottom",
         linespacing=1.15,
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.1},
