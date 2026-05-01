@@ -214,6 +214,24 @@ class LocalDimmingAplCurve:
 
 
 @dataclass
+class ThermalLuminanceSample:
+    index: int
+    timestamp: str
+    elapsed_seconds: float | None
+    luminance: float
+    x_chromaticity: float
+    y_chromaticity: float
+    backlight_temp_c: float | None
+
+
+@dataclass
+class ThermalLuminanceProfile:
+    source: str
+    metadata: dict[str, str]
+    samples: list[ThermalLuminanceSample]
+
+
+@dataclass
 class RunData:
     run_dir: Path
     summary: dict[str, Any]
@@ -225,6 +243,7 @@ class RunData:
     contrast: ContrastCurve | None
     gamut: GamutMetrics | None
     local_dimming_apl: LocalDimmingAplCurve | None
+    thermal_profile: ThermalLuminanceProfile | None
     warnings: list[str]
 
 
@@ -686,6 +705,21 @@ def parse_gamma_csv(path: Path) -> tuple[dict[str, str], list[dict[str, str]]]:
     return metadata, [row for row in reader]
 
 
+def parse_comment_csv(path: Path) -> tuple[dict[str, str], list[dict[str, str]]]:
+    metadata: dict[str, str] = {}
+    data_lines: list[str] = []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        for line in f:
+            if line.lstrip().startswith("#"):
+                parse_comment_metadata(line, metadata)
+            elif line.strip():
+                data_lines.append(line)
+    if not data_lines:
+        return metadata, []
+    reader = csv.DictReader(data_lines)
+    return metadata, [row for row in reader]
+
+
 def parse_comment_metadata(line: str, metadata: dict[str, str]) -> None:
     body = line.lstrip("#").strip()
     if not body:
@@ -786,6 +820,51 @@ def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve 
             endpoint_drift_percent=endpoint_drift,
             samples_per_patch=as_int(get_nested(test.data, "data", "samples_per_patch")),
             warnings=warnings.copy(),
+        ),
+        warnings,
+    )
+
+
+def extract_thermal_profile(run_dir: Path) -> tuple[ThermalLuminanceProfile | None, list[str]]:
+    warnings: list[str] = []
+    profile_path = run_dir / "raw" / "thermal-luminance-profile.csv"
+    if not profile_path.exists():
+        return None, warnings
+
+    try:
+        metadata, rows = parse_comment_csv(profile_path)
+    except OSError as exc:
+        warnings.append(f"could not load thermal luminance profile {profile_path}: {exc}")
+        return None, warnings
+
+    samples: list[ThermalLuminanceSample] = []
+    for idx, row in enumerate(rows, start=1):
+        luminance = as_float(row.get("Y"))
+        x_chrom = as_float(row.get("x"))
+        y_chrom = as_float(row.get("y"))
+        if luminance is None or x_chrom is None or y_chrom is None:
+            continue
+        samples.append(
+            ThermalLuminanceSample(
+                index=as_int(row.get("sample_index"), idx) or idx,
+                timestamp=str(row.get("timestamp") or ""),
+                elapsed_seconds=as_float(row.get("elapsed_seconds")),
+                luminance=luminance,
+                x_chromaticity=x_chrom,
+                y_chromaticity=y_chrom,
+                backlight_temp_c=as_float(row.get("backlight_temp_c")),
+            )
+        )
+
+    if not samples:
+        warnings.append(f"no usable thermal luminance samples in {profile_path}")
+        return None, warnings
+
+    return (
+        ThermalLuminanceProfile(
+            source=str(profile_path.relative_to(run_dir) if profile_path.is_relative_to(run_dir) else profile_path),
+            metadata=metadata,
+            samples=samples,
         ),
         warnings,
     )
@@ -1092,6 +1171,8 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
     gamut = extract_gamut(tests, args.reference_gamut)
     local_dimming_apl, apl_warnings = extract_local_dimming_apl(run_dir, tests)
     warnings.extend(apl_warnings)
+    thermal_profile, thermal_warnings = extract_thermal_profile(run_dir)
+    warnings.extend(thermal_warnings)
 
     return RunData(
         run_dir=run_dir,
@@ -1104,6 +1185,7 @@ def load_run_folder(run_dir: Path, args: argparse.Namespace) -> RunData:
         contrast=contrast,
         gamut=gamut,
         local_dimming_apl=local_dimming_apl,
+        thermal_profile=thermal_profile,
         warnings=warnings,
     )
 
@@ -1175,7 +1257,9 @@ def render_report_card(
     ax_gamma = fig.add_subplot(chart_grid[0, 1])
     ax_contrast = fig.add_subplot(chart_grid[1, 0])
     ax_gamut = fig.add_subplot(chart_grid[1, 1])
-    ax_local_dimming_apl = fig.add_subplot(chart_grid[2, :])
+    has_thermal_profile = run.thermal_profile is not None or (base_run is not None and base_run.thermal_profile is not None)
+    ax_local_dimming_apl = fig.add_subplot(chart_grid[2, 0] if has_thermal_profile else chart_grid[2, :])
+    ax_thermal = fig.add_subplot(chart_grid[2, 1]) if has_thermal_profile else None
     ax_footer = fig.add_subplot(grid[3, :])
 
     labels = series_labels(run, base_run, run_label, base_label)
@@ -1186,7 +1270,20 @@ def render_report_card(
     render_gamma(ax_gamma, run.gamma, base_run.gamma if base_run else None, labels)
     render_contrast(ax_contrast, run.contrast, base_run.contrast if base_run else None, labels)
     render_gamut(ax_gamut, run.gamut, reference_gamut, render_mode, run.warnings, base_run.gamut if base_run else None, labels)
-    render_local_dimming_apl(ax_local_dimming_apl, run.local_dimming_apl, base_run.local_dimming_apl if base_run else None, labels)
+    render_local_dimming_apl(
+        ax_local_dimming_apl,
+        run.local_dimming_apl,
+        base_run.local_dimming_apl if base_run else None,
+        labels,
+        compact=has_thermal_profile,
+    )
+    if ax_thermal is not None:
+        render_thermal_white_point_drift(
+            ax_thermal,
+            run.thermal_profile,
+            base_run.thermal_profile if base_run else None,
+            labels,
+        )
     render_footer(ax_footer, run, base_run)
 
     fig.patch.set_facecolor("white")
@@ -1472,8 +1569,9 @@ def render_local_dimming_apl(
     apl: LocalDimmingAplCurve | None,
     base_apl: LocalDimmingAplCurve | None = None,
     labels: SeriesLabels | None = None,
+    compact: bool = False,
 ) -> None:
-    style_chart(ax, "Peak luminance vs window size (backlight 100%)")
+    style_chart(ax, "Peak luminance vs window size" if compact else "Peak luminance vs window size (backlight 100%)")
     labels = labels or SeriesLabels(run="measured", base="base")
     if apl is None and base_apl is None:
         placeholder(ax, "No APL data in this run")
@@ -1566,23 +1664,36 @@ def render_local_dimming_apl(
         ratio = max(measured_y) / min(measured_y) if min(measured_y) > 0 else None
         attempted = apl.samples_attempted if apl and apl.samples_attempted is not None else len(apl.samples) if apl else len(measured)
         collected = apl.samples_collected if apl and apl.samples_collected is not None else len(measured)
-        badge_parts = [
-            f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}%",
-            f"{collected}/{attempted} measured",
-        ]
-        if ratio is not None:
-            badge_parts.insert(1, f"ratio {ratio:.2f}x")
-        if base_measured:
-            base_peak = max(base_measured, key=lambda sample: float(sample.luminance or -math.inf))
-            badge_parts.append(f"dPeak {float(peak.luminance or 0.0) - float(base_peak.luminance or 0.0):+.1f}")
-        if apl and apl.artifact_generated_timestamp:
-            badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
+        if compact:
+            badge_parts = [f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}% | {collected}/{attempted}"]
+            ratio_and_delta = []
+            if ratio is not None:
+                ratio_and_delta.append(f"ratio {ratio:.2f}x")
+            if base_measured:
+                base_peak = max(base_measured, key=lambda sample: float(sample.luminance or -math.inf))
+                ratio_and_delta.append(f"dPeak {float(peak.luminance or 0.0) - float(base_peak.luminance or 0.0):+.1f}")
+            if ratio_and_delta:
+                badge_parts.append(" | ".join(ratio_and_delta))
+            badge_text = "\n".join(badge_parts)
+        else:
+            badge_parts = [
+                f"peak {float(peak.luminance or 0.0):.1f} @ {peak.apl_percent:g}%",
+                f"{collected}/{attempted} measured",
+            ]
+            if ratio is not None:
+                badge_parts.insert(1, f"ratio {ratio:.2f}x")
+            if base_measured:
+                base_peak = max(base_measured, key=lambda sample: float(sample.luminance or -math.inf))
+                badge_parts.append(f"dPeak {float(peak.luminance or 0.0) - float(base_peak.luminance or 0.0):+.1f}")
+            if apl and apl.artifact_generated_timestamp:
+                badge_parts.append(f"gen {format_timestamp(apl.artifact_generated_timestamp)[:16]}")
+            badge_text = " | ".join(badge_parts)
         ax.text(
             0.985,
-            0.235,
-            " | ".join(badge_parts),
+            0.175 if compact else 0.235,
+            badge_text,
             transform=ax.transAxes,
-            fontsize=5.8,
+            fontsize=5.15 if compact else 5.8,
             color="#3D4650",
             ha="right",
             va="top",
@@ -1595,20 +1706,21 @@ def render_local_dimming_apl(
     skip_note = summarize_apl_skips(skipped)
     if skip_note:
         ax.text(0.015, 0.74, f"skipped: {skip_note}", transform=ax.transAxes, fontsize=5.5, color="#7A4F00", va="top")
-    ax.text(
-        0.985,
-        0.125,
-        "APL = centered square area; i1DisplayPro at centre.",
-        transform=ax.transAxes,
-        fontsize=5.5,
-        color="#596574",
-        ha="right",
-        va="top",
-        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.0},
-    )
+    if not compact:
+        ax.text(
+            0.985,
+            0.125,
+            "APL = centered square area; i1DisplayPro at centre.",
+            transform=ax.transAxes,
+            fontsize=5.5,
+            color="#596574",
+            ha="right",
+            va="top",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.0},
+        )
     ax.set_xlabel("APL (%)", fontsize=6.4)
     ax.set_ylabel("Peak Y (cd/m^2)", fontsize=6.4)
-    ax.legend(loc="upper left", bbox_to_anchor=(0.0, 0.56), fontsize=5.6, frameon=False)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.0, 0.56 if compact else 0.56), fontsize=5.4 if compact else 5.6, frameon=False)
 
 
 def summarize_apl_skips(skipped: list[LocalDimmingAplSample]) -> str:
@@ -1625,6 +1737,238 @@ def summarize_apl_skips(skipped: list[LocalDimmingAplSample]) -> str:
     if other:
         parts.append(f"other {len(other)}")
     return "; ".join(parts)
+
+
+def render_thermal_white_point_drift(
+    ax: plt.Axes,
+    profile: ThermalLuminanceProfile | None,
+    base_profile: ThermalLuminanceProfile | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
+    style_chart(ax, "Thermal White-Point Drift")
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if profile is None and base_profile is None:
+        placeholder(ax, "No thermal white-point data")
+        return
+
+    reference = REFERENCE_GAMUTS["ntsc"]
+    reference_white = reference["w"]
+    all_samples: list[ThermalLuminanceSample] = []
+    if base_profile:
+        all_samples.extend(base_profile.samples)
+    if profile:
+        all_samples.extend(profile.samples)
+    all_x = [sample.x_chromaticity for sample in all_samples]
+    all_y = [sample.y_chromaticity for sample in all_samples]
+    x_min, x_max, y_min, y_max = thermal_zoom_limits(all_x, all_y, reference_white)
+
+    draw_white_reference(ax, reference_white, "D65", DEFAULT_WHITE_TOLERANCE)
+    if base_profile is not None:
+        plot_thermal_profile(ax, base_profile, labels.base, BASELINE_COLOR, baseline=profile is not None)
+    if profile is not None:
+        plot_thermal_profile(ax, profile, labels.run, "#A23E48", baseline=False)
+
+    draw_ntsc_context_inset(ax, reference, reference_white, (x_min, x_max, y_min, y_max))
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("CIE x", fontsize=6.4)
+    ax.set_ylabel("CIE y", fontsize=6.4)
+    ax.legend(loc="upper left", fontsize=5.4, frameon=False)
+
+    summary_profile = profile or base_profile
+    if summary_profile is not None:
+        add_thermal_summary_badge(ax, summary_profile, reference_white)
+
+
+def draw_white_reference(
+    ax: plt.Axes,
+    reference_white: tuple[float, float],
+    label: str,
+    tolerance: float,
+) -> None:
+    ax.plot(reference_white[0], reference_white[1], "x", color="#4F5965", markersize=4.7, label=label, zorder=5)
+    ax.add_patch(
+        Ellipse(
+            xy=reference_white,
+            width=tolerance * 2,
+            height=tolerance * 2.4,
+            angle=-10,
+            fill=False,
+            edgecolor="#697684",
+            linestyle=":",
+            linewidth=1.0,
+            label=f"D65 tol {tolerance:.3f}",
+            zorder=2,
+        )
+    )
+
+
+def thermal_zoom_limits(
+    x_values: list[float],
+    y_values: list[float],
+    reference_white: tuple[float, float],
+) -> tuple[float, float, float, float]:
+    x_candidates = x_values + [reference_white[0] - DEFAULT_WHITE_TOLERANCE, reference_white[0] + DEFAULT_WHITE_TOLERANCE]
+    y_candidates = y_values + [reference_white[1] - DEFAULT_WHITE_TOLERANCE * 1.2, reference_white[1] + DEFAULT_WHITE_TOLERANCE * 1.2]
+    x_min = min(x_candidates)
+    x_max = max(x_candidates)
+    y_min = min(y_candidates)
+    y_max = max(y_candidates)
+    span = max(x_max - x_min, y_max - y_min, 0.020)
+    pad = max(span * 0.18, 0.004)
+    return x_min - pad, x_max + pad, y_min - pad, y_max + pad
+
+
+def plot_thermal_profile(
+    ax: plt.Axes,
+    profile: ThermalLuminanceProfile,
+    label: str,
+    color: str,
+    baseline: bool,
+) -> None:
+    samples = profile.samples
+    if not samples:
+        return
+    x_values = [sample.x_chromaticity for sample in samples]
+    y_values = [sample.y_chromaticity for sample in samples]
+    if baseline:
+        ax.plot(
+            x_values,
+            y_values,
+            "o--",
+            color=color,
+            markerfacecolor="white",
+            linewidth=1.0,
+            markersize=2.6,
+            label=label,
+            zorder=3,
+        )
+    else:
+        ax.plot(x_values, y_values, "-", color=color, linewidth=1.05, alpha=0.8, label=label, zorder=3)
+        temps = [sample.backlight_temp_c if sample.backlight_temp_c is not None else math.nan for sample in samples]
+        finite_temps = [temp for temp in temps if not math.isnan(temp)]
+        if finite_temps:
+            ax.scatter(
+                x_values,
+                y_values,
+                c=temps,
+                cmap="coolwarm",
+                s=10,
+                edgecolors="none",
+                zorder=4,
+            )
+        else:
+            ax.scatter(x_values, y_values, color=color, s=10, edgecolors="none", zorder=4)
+
+    start = samples[0]
+    end = samples[-1]
+    ax.plot(start.x_chromaticity, start.y_chromaticity, "o", color=color, markerfacecolor="white" if baseline else color, markersize=4.2, zorder=6)
+    ax.plot(end.x_chromaticity, end.y_chromaticity, "s", color=color, markerfacecolor="white" if baseline else color, markersize=4.0, zorder=6)
+    if not baseline:
+        ax.annotate(
+            "",
+            xy=(end.x_chromaticity, end.y_chromaticity),
+            xytext=(start.x_chromaticity, start.y_chromaticity),
+            arrowprops={"arrowstyle": "->", "color": color, "linewidth": 0.9, "shrinkA": 5, "shrinkB": 5},
+            zorder=5,
+        )
+        ax.annotate(
+            thermal_point_label("start", start),
+            (start.x_chromaticity, start.y_chromaticity),
+            textcoords="offset points",
+            xytext=(5, 8),
+            fontsize=5.2,
+            color="#3D4650",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
+        )
+        ax.annotate(
+            thermal_point_label("end", end),
+            (end.x_chromaticity, end.y_chromaticity),
+            textcoords="offset points",
+            xytext=(5, 8),
+            fontsize=5.2,
+            color="#3D4650",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 0.7},
+        )
+
+
+def thermal_point_label(prefix: str, sample: ThermalLuminanceSample) -> str:
+    parts = [prefix]
+    if sample.backlight_temp_c is not None:
+        parts.append(f"{sample.backlight_temp_c:.1f}C")
+    parts.append(f"{sample.luminance:.0f}Y")
+    return " ".join(parts)
+
+
+def draw_ntsc_context_inset(
+    ax: plt.Axes,
+    reference: dict[str, Any],
+    reference_white: tuple[float, float],
+    zoom_limits: tuple[float, float, float, float],
+) -> None:
+    inset = ax.inset_axes([0.69, 0.57, 0.27, 0.35])
+    ref_triangle = [reference["r"], reference["g"], reference["b"], reference["r"]]
+    inset.plot([p[0] for p in ref_triangle], [p[1] for p in ref_triangle], "--", color="#9AA4AF", linewidth=0.7)
+    inset.plot(reference_white[0], reference_white[1], "x", color="#4F5965", markersize=3.0)
+    x_min, x_max, y_min, y_max = zoom_limits
+    inset.add_patch(
+        Rectangle(
+            (x_min, y_min),
+            x_max - x_min,
+            y_max - y_min,
+            fill=False,
+            edgecolor="#A23E48",
+            linewidth=0.7,
+        )
+    )
+    inset.set_xlim(0.0, 0.78)
+    inset.set_ylim(0.0, 0.82)
+    inset.set_xticks([])
+    inset.set_yticks([])
+    inset.set_title("NTSC", fontsize=4.8, pad=1)
+    for spine in inset.spines.values():
+        spine.set_color("#D4DAE1")
+        spine.set_linewidth(0.5)
+
+
+def add_thermal_summary_badge(
+    ax: plt.Axes,
+    profile: ThermalLuminanceProfile,
+    reference_white: tuple[float, float],
+) -> None:
+    if not profile.samples:
+        return
+    start = profile.samples[0]
+    end = profile.samples[-1]
+    temp_text = "temp n/a"
+    if start.backlight_temp_c is not None and end.backlight_temp_c is not None:
+        temp_text = f"{start.backlight_temp_c:.1f}->{end.backlight_temp_c:.1f}C"
+    y_delta = end.luminance - start.luminance
+    y_delta_percent = y_delta / start.luminance * 100.0 if start.luminance else 0.0
+    d65_start = xy_distance((start.x_chromaticity, start.y_chromaticity), reference_white)
+    d65_end = xy_distance((end.x_chromaticity, end.y_chromaticity), reference_white)
+    drift = xy_distance((start.x_chromaticity, start.y_chromaticity), (end.x_chromaticity, end.y_chromaticity))
+    badge = (
+        f"{temp_text} | Y {start.luminance:.0f}->{end.luminance:.0f} ({y_delta_percent:+.1f}%)\n"
+        f"dD65 {d65_start:.4f}->{d65_end:.4f} | drift {drift:.4f} xy"
+    )
+    ax.text(
+        0.02,
+        0.055,
+        badge,
+        transform=ax.transAxes,
+        fontsize=5.35,
+        color="#3D4650",
+        ha="left",
+        va="bottom",
+        linespacing=1.15,
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.1},
+    )
+
+
+def xy_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
+    return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
 def render_gamut(

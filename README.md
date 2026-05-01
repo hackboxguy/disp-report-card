@@ -79,6 +79,11 @@ The default gamut panel uses NTSC 1953 primaries with D65 white. It reports refe
 relative measured area, measured white-point offset, and distance against the default D65 tolerance
 ellipse of `0.010`.
 
+When `raw/thermal-luminance-profile.csv` is present, the bottom chart row splits to add a
+`Thermal White-Point Drift` panel. That panel shows the display white-point path during warm-up in
+a zoomed CIE xy view with D65 tolerance, an NTSC context inset, start/end temperature labels, and
+luminance drop summary.
+
 ### Comparison Mode
 
 Comparison mode overlays a baseline run and the current run on shared chart scales. FPGA labels

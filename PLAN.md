@@ -17,6 +17,7 @@
 - Done: consume and render the local-dimming APL sweep artifact when it is present.
 - Done: add comparison mode for baseline/run overlays and changed-test highlighting.
 - Done: add comparison label overrides for concise firmware labels in plots.
+- Done: add optional thermal white-point drift rendering from live thermal luminance CSV.
 - Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata

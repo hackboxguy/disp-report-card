@@ -296,6 +296,36 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         apl_row = next(row for row in run.status_rows if row.name == "test-local-dimming-apl")
         self.assertEqual(apl_row.note, "2/3 APL, 1 skip")
 
+    def test_thermal_profile_csv_is_loaded_and_rendered(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            raw_dir.mkdir(parents=True)
+            write_json(run_dir / "summary.json", {"run_id": "thermal-profile"})
+            (raw_dir / "thermal-luminance-profile.csv").write_text(
+                "\n".join(
+                    [
+                        "# live display measurement log",
+                        "# record_interval_seconds=30.0",
+                        "sample_index,timestamp,elapsed_seconds,X,Y,Z,x,y,backlight_temp_c",
+                        "1,2026-04-30T17:36:28+02:00,4.0,1,1175.5,1,0.3101,0.3089,37.8",
+                        "2,2026-04-30T18:40:59+02:00,3849.2,1,1122.5,1,0.3045,0.3020,55.3",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+            output = Path(temp_dir) / "thermal.png"
+            render_report_card(run, output, "Display Test Report Card", 72, "ntsc", "basic")
+
+            self.assertIsNotNone(run.thermal_profile)
+            self.assertEqual(run.thermal_profile.source, "raw/thermal-luminance-profile.csv")
+            self.assertEqual(run.thermal_profile.metadata["record_interval_seconds"], "30.0")
+            self.assertEqual(len(run.thermal_profile.samples), 2)
+            self.assertAlmostEqual(run.thermal_profile.samples[-1].backlight_temp_c, 55.3)
+            self.assertTrue(output.exists())
+
     def test_comparison_mode_highlights_result_changes_and_renders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
