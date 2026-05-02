@@ -2029,9 +2029,11 @@ def add_thermal_summary_badge(
     d65_start = xy_distance((start.x_chromaticity, start.y_chromaticity), reference_white)
     d65_end = xy_distance((end.x_chromaticity, end.y_chromaticity), reference_white)
     drift = xy_distance((start.x_chromaticity, start.y_chromaticity), (end.x_chromaticity, end.y_chromaticity))
+    tolerance_multiple = thermal_final_d65_tolerance_multiple(profile, reference_white)
+    tolerance_text = f" ({tolerance_multiple:.1f}x tol)" if tolerance_multiple is not None else ""
     badge = (
         f"{temp_text} | Y {y_delta_percent:+.1f}%\n"
-        f"dD65 {d65_start:.4f}->{d65_end:.4f} | drift {drift:.4f} xy"
+        f"dD65 {d65_start:.4f}->{d65_end:.4f}{tolerance_text} | drift {drift:.4f} xy"
     )
     ax.text(
         0.985,
@@ -2062,6 +2064,17 @@ def add_thermal_runtime_badge(ax: plt.Axes, profile: ThermalLuminanceProfile) ->
         va="top",
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.76, "pad": 1.0},
     )
+
+
+def thermal_final_d65_tolerance_multiple(
+    profile: ThermalLuminanceProfile,
+    reference_white: tuple[float, float],
+    tolerance: float = DEFAULT_WHITE_TOLERANCE,
+) -> float | None:
+    if not profile.samples or tolerance <= 0:
+        return None
+    end = profile.samples[-1]
+    return xy_distance((end.x_chromaticity, end.y_chromaticity), reference_white) / tolerance
 
 
 def thermal_duration_minutes(profile: ThermalLuminanceProfile) -> float | None:

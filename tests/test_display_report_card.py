@@ -5,12 +5,16 @@ import unittest
 from pathlib import Path
 
 from src.display_report_card import (
+    REFERENCE_GAMUTS,
+    ThermalLuminanceProfile,
+    ThermalLuminanceSample,
     comparison_status_rows,
     format_fpga_label,
     load_run_folder,
     render_report_card,
     series_labels,
     thermal_duration_minutes,
+    thermal_final_d65_tolerance_multiple,
 )
 
 
@@ -400,6 +404,19 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
             self.assertAlmostEqual(run.thermal_profile.samples[-1].backlight_temp_c, 55.3)
             self.assertAlmostEqual(thermal_duration_minutes(run.thermal_profile), 64.08666666666667)
             self.assertTrue(output.exists())
+
+    def test_thermal_final_d65_tolerance_multiple_uses_endpoint(self) -> None:
+        reference_white = REFERENCE_GAMUTS["ntsc"]["w"]
+        profile = ThermalLuminanceProfile(
+            source="raw/thermal-luminance-profile.csv",
+            metadata={},
+            samples=[
+                ThermalLuminanceSample(1, "", 0.0, 100.0, reference_white[0], reference_white[1], 30.0),
+                ThermalLuminanceSample(2, "", 60.0, 90.0, reference_white[0] + 0.025, reference_white[1], 55.0),
+            ],
+        )
+
+        self.assertAlmostEqual(thermal_final_d65_tolerance_multiple(profile, reference_white), 2.5)
 
     def test_comparison_mode_highlights_result_changes_and_renders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
