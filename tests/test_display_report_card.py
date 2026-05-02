@@ -67,23 +67,36 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(peak.apl_percent, 35.0)
         self.assertAlmostEqual(peak.luminance, 871.972473)
 
-    def test_loads_15_6_fixture_with_partial_contrast(self) -> None:
+    def test_loads_15_6_fixture_with_v5_artifacts(self) -> None:
         run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
 
-        self.assertEqual(run.header.run_id, "run-20260426-080625")
+        self.assertEqual(run.header.run_id, "run-20260502-135554")
         self.assertEqual(run.header.display_size, '15.6"')
         self.assertEqual(run.header.display_resolution, "2560x1440")
-        self.assertEqual(len(run.status_rows), 20)
+        self.assertEqual(len(run.status_rows), 23)
         self.assertIsNotNone(run.gamma)
-        self.assertAlmostEqual(run.gamma.gamma, 2.5371418606498857)
+        self.assertAlmostEqual(run.gamma.gamma, 2.524067303520578)
         self.assertEqual(run.gamma.source, "artifacts/gamma_curve_test-gamma-curve.csv")
-        self.assertLess(run.gamma.endpoint_drift_percent, -2.0)
-        self.assertEqual(run.contrast.result, "ERROR")
-        self.assertEqual(len(run.contrast.brightness), 4)
-        self.assertEqual(set(run.contrast.expected_levels) - set(run.contrast.brightness), {25.0})
-        self.assertAlmostEqual(run.gamut.coverage_percent, 97.14563621344901)
+        self.assertLess(run.gamma.endpoint_drift_percent, -1.0)
+        self.assertEqual(run.contrast.result, "PASS")
+        self.assertEqual(len(run.contrast.brightness), 5)
+        self.assertEqual(run.contrast.expected_levels, run.contrast.brightness)
+        self.assertAlmostEqual(run.gamut.coverage_percent, 96.80545728308961)
         self.assertGreater(run.gamut.relative_area_percent, 100.0)
         self.assertTrue(run.gamut.white_within_tolerance)
+        self.assertEqual(gamut_temperature_annotation_parts(run.gamut), ["temp 40.6->43.5C", "avg 42.1C"])
+        self.assertIsNotNone(run.local_dimming_apl)
+        self.assertEqual(run.local_dimming_apl.samples_attempted, 14)
+        self.assertEqual(run.local_dimming_apl.samples_collected, 14)
+        self.assertEqual(run.local_dimming_apl.samples_skipped, 0)
+        measured = [sample for sample in run.local_dimming_apl.samples if sample.fits_screen]
+        peak = max(measured, key=lambda sample: sample.luminance or 0)
+        self.assertEqual(len(measured), 14)
+        self.assertEqual(peak.apl_percent, 3.0)
+        self.assertAlmostEqual(peak.luminance, 1124.068832)
+        nits_row = next(row for row in run.status_rows if row.name == "test-brightness-nits-verify")
+        self.assertEqual(nits_row.result, "PASS")
+        self.assertEqual(nits_row.note, "max 3.44%@20%")
 
     def test_gamut_temperature_metadata_is_loaded(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

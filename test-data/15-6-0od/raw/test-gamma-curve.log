@@ -1,21 +1,21 @@
-[08:20:29] Gamma measurement parameters:
-[08:20:29]   Patches: 33, samples per patch: 3
-[08:20:29]   Settle (first/subsequent): 5s/1s
-[08:20:29]   Backlight pinned at: 100%
-[08:20:29] 
-[08:20:29] Pass/fail thresholds:
-[08:20:29]   Gamma:           1.8 to 2.6
-[08:20:29]   Contrast ratio:  >=500:1
-[08:20:29]   Black level:     <=2 nits
-[08:20:29]   RMS residual:    <=0.15 (log-space)
-[08:20:29] Pattern generator not running, attempting to start...
-[08:20:34] 
-[08:20:34] Running gamma sweep (this will take several minutes)...
-[08:31:44] 
-[08:31:44] Results:
-[08:31:44]   Gamma (power-law):  2.5371418606498857
-[08:31:44]   Y_black:            0 nits
-[08:31:44]   Y_max:              1102.4271956666666 nits
-[08:31:44]   Contrast ratio:     1000000:1
-[08:31:44]   RMS residual (γ):   0.09458883336316061
-[08:31:44]   RMS residual (sRGB): 0.7355685777191312
+[14:08:59] Gamma measurement parameters:
+[14:08:59]   Patches: 33, samples per patch: 3
+[14:08:59]   Settle (first/subsequent): 5s/1s
+[14:08:59]   Backlight pinned at: 100%
+[14:08:59]
+[14:08:59] Pass/fail thresholds:
+[14:08:59]   Gamma:           1.8 to 2.6
+[14:08:59]   Contrast ratio:  >=500:1
+[14:08:59]   Black level:     <=2 nits
+[14:08:59]   RMS residual:    <=0.15 (log-space)
+[14:08:59] Pattern generator not running, attempting to start...
+[14:09:04]
+[14:09:04] Running gamma sweep (this will take several minutes)...
+[14:18:31]
+[14:18:31] Results:
+[14:18:31]   Gamma (power-law):  2.524067303520578
+[14:18:31]   Y_black:            0 nits
+[14:18:31]   Y_max:              1104.972447 nits
+[14:18:31]   Contrast ratio:     1000000:1
+[14:18:31]   RMS residual (γ):   0.10056014220338931
+[14:18:31]   RMS residual (sRGB): 0.7180285054517225

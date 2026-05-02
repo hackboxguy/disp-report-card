@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-brightness-nits-verify-20260502-140526",
+  "test_info": {
+    "name": "test-brightness-nits-verify",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Verify als-dimmer brightness_to_nits LUT against measured calibration",
+    "file": "tests/02-validation/test-brightness-nits-verify.sh"
+  },
+  "execution": {
+    "start_time": "2026-05-02T12:05:06Z",
+    "end_time": "2026-05-02T12:05:26Z",
+    "duration_ms": 20000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "nits_verify_json": "artifacts/brightness-nits-verify.json",
+    "nits_verify_csv":  "artifacts/brightness-nits-verify.csv",
+    "reference_source": "per-run-artifact",
+    "max_nits_delta_percent": 4,
+    "y_meas_floor_nits": 1.0,
+    "samples_attempted": 11,
+    "samples_collected": 11,
+    "samples_compared": 10,
+    "samples_floor_skipped": 1,
+    "samples_failed": 0,
+    "lut_label": "warm",
+    "lut_min_nits": 0,
+    "lut_max_nits": 1105.8496,
+    "thermal_enabled": true
+  },
+  "validation": {
+    "checks": [{
+      "name": "all_within_threshold",
+      "expected": "all ≤ 4%",
+      "actual": "all 10 points within threshold",
+      "result": "PASS"
+    }],
+    "passed": 1,
+    "failed": 0
+  },
+  "errors": []
+}

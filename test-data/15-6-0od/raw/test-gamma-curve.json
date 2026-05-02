@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-gamma-curve-20260426-083144",
+  "test_id": "test-gamma-curve-20260502-141831",
   "test_info": {
     "name": "test-gamma-curve",
     "category": "validation",
@@ -9,9 +9,9 @@
     "file": "tests/02-validation/test-gamma-curve.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:20:28Z",
-    "end_time": "2026-04-26T06:31:44Z",
-    "duration_ms": 676000,
+    "start_time": "2026-05-02T12:08:59Z",
+    "end_time": "2026-05-02T12:18:31Z",
+    "duration_ms": 572000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0
@@ -23,23 +23,23 @@
     "framework_version": "0.1.0"
   },
   "data": {
-    "gamma": 2.5371418606498857,
+    "gamma": 2.524067303520578,
     "y_black_nits": 0,
-    "y_max_nits": 1102.4271956666666,
+    "y_max_nits": 1104.972447,
     "contrast_ratio": 1000000,
-    "rms_residual_gamma": 0.09458883336316061,
-    "rms_residual_srgb": 0.7355685777191312,
+    "rms_residual_gamma": 0.10056014220338931,
+    "rms_residual_srgb": 0.7180285054517225,
     "num_patches": 33,
     "samples_per_patch": 3,
     "backlight_percent": 100,
-    "csv_path": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-080625/artifacts/gamma_curve_test-gamma-curve.csv",
-    "progress_log": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260426-080625/artifacts/gamma_progress.log"
+    "csv_path": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260502-135554/artifacts/gamma_curve_test-gamma-curve.csv",
+    "progress_log": "/home/pi/micropanel/share/disptool/display-test-framework/results/run-20260502-135554/artifacts/gamma_progress.log"
   },
   "validation": {
     "checks": [{
       "name": "gamma_in_range",
       "expected": "1.8-2.6",
-      "actual": "2.5371418606498857",
+      "actual": "2.524067303520578",
       "result": "PASS"
     }, {
       "name": "contrast_ratio_ok",
@@ -54,7 +54,7 @@
     }, {
       "name": "rms_residual_ok",
       "expected": "<=0.15",
-      "actual": "0.09458883336316061",
+      "actual": "0.10056014220338931",
       "result": "PASS"
     }],
     "passed": 4,

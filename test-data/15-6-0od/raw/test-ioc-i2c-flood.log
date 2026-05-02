@@ -1,8 +1,8 @@
-[08:06:36] IOC I2C flood test: 50 iterations, 100ms delay
-[08:06:36] Reference FW Version: v01.06
-[08:06:38] Progress: 10/50 iterations
-[08:06:40] Progress: 20/50 iterations
-[08:06:41] Progress: 30/50 iterations
-[08:06:43] Progress: 40/50 iterations
-[08:06:45] Progress: 50/50 iterations
-[08:06:45] Results: 150/150 passed, 0 failed
+[13:56:05] IOC I2C flood test: 50 iterations, 100ms delay
+[13:56:05] Reference FW Version: v01.06
+[13:56:07] Progress: 10/50 iterations
+[13:56:09] Progress: 20/50 iterations
+[13:56:11] Progress: 30/50 iterations
+[13:56:13] Progress: 40/50 iterations
+[13:56:14] Progress: 50/50 iterations
+[13:56:15] Results: 150/150 passed, 0 failed

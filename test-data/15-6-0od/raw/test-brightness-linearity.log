@@ -1,32 +1,32 @@
-[08:15:50] Validation parameters:
-[08:15:50]   Test points: 0 12.5 25 37.5 50 62.5 75 87.5 100%
-[08:15:50]   Tolerance: ±5%
-[08:15:50]   Settle time: 2s per point
-[08:15:50] Using calibration file: /home/pi/micropanel/share/disptool/display-test-framework/config/calibration/15.6-0od-lattice-ecp5-brightness.json
-[08:15:50] 
-[08:15:50] Optional accessories:
-[08:15:50]   ⓘ Power supply (ka3005p): Not available (measurements will be skipped)
-[08:15:50] 
-[08:15:50] Showing white pattern for measurements...
-[08:15:53] White pattern active
-[08:15:54] 
-[08:15:54] Starting validation measurements...
-[08:16:10] Brightness     0%: [0;32mPASS[0m (luminance near zero)
-[08:16:16] Brightness  12.5%: [0;32mPASS[0m (deviation: 0%)
-[08:16:21] Brightness    25%: [0;32mPASS[0m (deviation: 0%)
-[08:16:32] Brightness  37.5%: [0;32mPASS[0m (deviation: 0%)
-[08:16:37] Brightness    50%: [0;32mPASS[0m (deviation: 0%)
-[08:16:43] Brightness  62.5%: [0;32mPASS[0m (deviation: 0%)
-[08:16:48] Brightness    75%: [0;32mPASS[0m (deviation: 0%)
-[08:16:54] Brightness  87.5%: [0;32mPASS[0m (deviation: 0%)
-[08:16:59] Brightness   100%: [0;32mPASS[0m (deviation: 0%)
-[08:16:59] 
-[08:16:59] Validation complete!
-[08:16:59]   Total points: 9
-[08:16:59]   Passed: [0;32m9[0m
-[08:16:59]   Failed: [0;31m0[0m
-[08:16:59] 
-[08:16:59] Brightness linearity validation: [0;32mPASS[0m
-[08:16:59] 
-[08:16:59] Turning off pattern...
-[08:17:00] Pattern turned off
+[14:04:00] Validation parameters:
+[14:04:00]   Test points: 0 12.5 25 37.5 50 62.5 75 87.5 100%
+[14:04:00]   Tolerance: ±5%
+[14:04:00]   Settle time: 2s per point
+[14:04:00] Using calibration file: /home/pi/micropanel/share/disptool/display-test-framework/config/calibration/15.6-0od-lattice-ecp5-brightness.json
+[14:04:00]
+[14:04:00] Optional accessories:
+[14:04:00]   ⓘ Power supply (ka3005p): Not available (measurements will be skipped)
+[14:04:00]
+[14:04:00] Showing white pattern for measurements...
+[14:04:03] White pattern active
+[14:04:04]
+[14:04:04] Starting validation measurements...
+[14:04:21] Brightness     0%: [0;32mPASS[0m (luminance near zero)
+[14:04:26] Brightness  12.5%: [0;32mPASS[0m (deviation: 0%)
+[14:04:32] Brightness    25%: [0;32mPASS[0m (deviation: 0%)
+[14:04:37] Brightness  37.5%: [0;32mPASS[0m (deviation: 0%)
+[14:04:43] Brightness    50%: [0;32mPASS[0m (deviation: 0%)
+[14:04:48] Brightness  62.5%: [0;32mPASS[0m (deviation: 0%)
+[14:04:54] Brightness    75%: [0;32mPASS[0m (deviation: 0%)
+[14:04:59] Brightness  87.5%: [0;32mPASS[0m (deviation: 0%)
+[14:05:05] Brightness   100%: [0;32mPASS[0m (deviation: 0%)
+[14:05:05]
+[14:05:05] Validation complete!
+[14:05:05]   Total points: 9
+[14:05:05]   Passed: [0;32m9[0m
+[14:05:05]   Failed: [0;31m0[0m
+[14:05:05]
+[14:05:05] Brightness linearity validation: [0;32mPASS[0m
+[14:05:05]
+[14:05:05] Turning off pattern...
+[14:05:05] Pattern turned off

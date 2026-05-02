@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-brightness-write-20260426-080627",
+  "test_id": "test-brightness-write-20260502-135557",
   "test_info": {
     "name": "test-brightness-write",
     "category": "unit",
@@ -9,9 +9,9 @@
     "file": "tests/00-unit/test-brightness-write.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:06:27Z",
-    "end_time": "2026-04-26T06:06:27Z",
-    "duration_ms": 0,
+    "start_time": "2026-05-02T11:55:56Z",
+    "end_time": "2026-05-02T11:55:57Z",
+    "duration_ms": 1000,
     "exit_code": 0,
     "result": "PASS",
     "retries": 0

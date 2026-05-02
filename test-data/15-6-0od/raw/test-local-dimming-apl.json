@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "test_id": "test-local-dimming-apl-20260502-141952",
+  "test_info": {
+    "name": "test-local-dimming-apl",
+    "category": "validation",
+    "version": "1.0",
+    "description": "Sweep white-window APL (1-50%) at 100% backlight to characterize local dimming",
+    "file": "tests/02-validation/test-local-dimming-apl.sh"
+  },
+  "execution": {
+    "start_time": "2026-05-02T12:18:31Z",
+    "end_time": "2026-05-02T12:19:52Z",
+    "duration_ms": 81000,
+    "exit_code": 0,
+    "result": "PASS",
+    "retries": 0
+  },
+  "environment": {
+    "display_model": "15.6-0od-lattice-ecp5",
+    "i2c_device": "/dev/i2c-1",
+    "hostname": "raspberrypi",
+    "framework_version": "0.1.0"
+  },
+  "data": {
+    "apl_json": "artifacts/local-dimming-apl-sweep.json",
+    "apl_csv":  "artifacts/local-dimming-apl-sweep.csv",
+    "apl_percents": "1 2 3 4 5 10 15 20 25 30 35 40 45 50",
+    "samples_attempted": 14,
+    "samples_collected": 14,
+    "samples_skipped": 0,
+    "samples_failed": 0,
+    "backlight_percent": 100,
+    "display_diagonal_inch": 15.6,
+    "display_aspect_ratio": "2560:1440",
+    "screen_width_mm": 345.35,
+    "screen_height_mm": 194.26,
+    "screen_area_mm2": 67087.69,
+    "min_box_size_mm": 25
+  },
+  "validation": {
+    "checks": [{
+      "name": "samples_collected",
+      "expected": ">0",
+      "actual": "14",
+      "result": "PASS"
+    }],
+    "passed": 1,
+    "failed": 0
+  },
+  "errors": []
+}

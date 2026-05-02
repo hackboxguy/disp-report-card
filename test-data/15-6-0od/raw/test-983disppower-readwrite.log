@@ -1,3 +1,3 @@
-[08:06:25] Reading initial 983 display power state...
-[08:06:25] Initial state: ON
-[08:06:25] 983 display power write test skipped (IOC_DISPPOWER_WRITE_ENABLED=no)
+[13:55:54] Reading initial 983 display power state...
+[13:55:55] Initial state: ON
+[13:55:55] 983 display power write test skipped (IOC_DISPPOWER_WRITE_ENABLED=no)

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-iocversion-read-20260426-080629",
+  "test_id": "test-iocversion-read-20260502-135558",
   "test_info": {
     "name": "test-iocversion-read",
     "category": "unit",
@@ -9,8 +9,8 @@
     "file": "tests/00-unit/test-iocversion-read.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:06:29Z",
-    "end_time": "2026-04-26T06:06:29Z",
+    "start_time": "2026-05-02T11:55:58Z",
+    "end_time": "2026-05-02T11:55:58Z",
     "duration_ms": 0,
     "exit_code": 0,
     "result": "PASS",

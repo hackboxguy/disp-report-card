@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "test_id": "test-als-readout-20260426-080626",
+  "test_id": "test-als-readout-20260502-135555",
   "test_info": {
     "name": "test-als-readout",
     "category": "unit",
@@ -9,8 +9,8 @@
     "file": "tests/00-unit/test-als-readout.sh"
   },
   "execution": {
-    "start_time": "2026-04-26T06:06:26Z",
-    "end_time": "2026-04-26T06:06:26Z",
+    "start_time": "2026-05-02T11:55:55Z",
+    "end_time": "2026-05-02T11:55:55Z",
     "duration_ms": 0,
     "exit_code": 2,
     "result": "SKIP",
