@@ -2098,18 +2098,17 @@ def add_thermal_tolerance_exit_marker(
     label = "tol exit"
     if tolerance_exit.backlight_temp_c is not None:
         label += f" ~{tolerance_exit.backlight_temp_c:.1f}C"
-    ax.annotate(
+    ax.text(
+        0.035,
+        0.755,
         label,
-        xy=(tolerance_exit.x_chromaticity, tolerance_exit.y_chromaticity),
-        xytext=(5, 5),
-        textcoords="offset points",
+        transform=ax.transAxes,
         fontsize=5.2,
         color="#8A5200",
         ha="left",
-        va="bottom",
+        va="top",
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.74, "pad": 0.7},
         zorder=9,
-        annotation_clip=True,
     )
 
 
