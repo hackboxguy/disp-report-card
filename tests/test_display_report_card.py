@@ -10,6 +10,7 @@ from src.display_report_card import (
     ThermalLuminanceSample,
     comparison_status_rows,
     format_fpga_label,
+    gamut_temperature_annotation_parts,
     load_run_folder,
     render_report_card,
     series_labels,
@@ -83,6 +84,42 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertAlmostEqual(run.gamut.coverage_percent, 97.14563621344901)
         self.assertGreater(run.gamut.relative_area_percent, 100.0)
         self.assertTrue(run.gamut.white_within_tolerance)
+
+    def test_gamut_temperature_metadata_is_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            raw_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "gamut-temp"})
+            write_json(
+                raw_dir / "test-color-gamut.json",
+                {
+                    "test_info": {"name": "test-color-gamut", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {
+                        "backlight_temp_c_start": 40.6,
+                        "backlight_temp_c_end": 43.5,
+                        "backlight_temp_c_avg": 42.05,
+                        "backlight_temp_source": "disptool-bltemp",
+                        "gamut_data": [
+                            {"color": "W", "Y_luminance": 1000, "x_chromaticity": 0.3127, "y_chromaticity": 0.3290, "backlight_temp_c": 40.6},
+                            {"color": "R", "x_chromaticity": 0.68, "y_chromaticity": 0.32, "backlight_temp_c": 41.1},
+                            {"color": "G", "x_chromaticity": 0.23, "y_chromaticity": 0.71, "backlight_temp_c": 42.0},
+                            {"color": "B", "x_chromaticity": 0.14, "y_chromaticity": 0.08, "backlight_temp_c": 43.5},
+                        ],
+                    },
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        self.assertIsNotNone(run.gamut)
+        self.assertAlmostEqual(run.gamut.backlight_temp_c_start, 40.6)
+        self.assertAlmostEqual(run.gamut.backlight_temp_c_end, 43.5)
+        self.assertAlmostEqual(run.gamut.backlight_temp_c_avg, 42.05)
+        self.assertEqual(run.gamut.backlight_temp_source, "disptool-bltemp")
+        self.assertEqual(run.gamut.color_backlight_temps["B"], 43.5)
+        self.assertEqual(gamut_temperature_annotation_parts(run.gamut), ["temp 40.6->43.5C", "avg 42.1C"])
 
     def test_missing_summary_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

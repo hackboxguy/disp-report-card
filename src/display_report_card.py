@@ -187,6 +187,11 @@ class GamutMetrics:
     white_tolerance: float
     white_tolerance_distance: float | None
     white_within_tolerance: bool | None
+    backlight_temp_c_start: float | None = None
+    backlight_temp_c_end: float | None = None
+    backlight_temp_c_avg: float | None = None
+    backlight_temp_source: str = ""
+    color_backlight_temps: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -1196,15 +1201,20 @@ def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetri
         return None
     reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["ntsc"])
     points: dict[str, tuple[float, float]] = {}
+    color_backlight_temps: dict[str, float] = {}
     white_luminance: float | None = None
     white_point: tuple[float, float] | None = None
+    data = get_nested(test.data, "data", default={}) or {}
 
-    for sample in get_nested(test.data, "data", "gamut_data", default=[]) or []:
+    for sample in data.get("gamut_data", []) or []:
         color = str(sample.get("color", "")).upper()
         x = as_float(sample.get("x_chromaticity"))
         y = as_float(sample.get("y_chromaticity"))
         if color and x is not None and y is not None:
             points[color] = (x, y)
+        temp_c = as_float(sample.get("backlight_temp_c"))
+        if color and temp_c is not None:
+            color_backlight_temps[color] = temp_c
         if color == "W":
             white_luminance = as_float(sample.get("Y_luminance"))
             if x is not None and y is not None:
@@ -1262,6 +1272,11 @@ def extract_gamut(tests: dict[str, RawTest], reference_gamut: str) -> GamutMetri
         white_tolerance=DEFAULT_WHITE_TOLERANCE,
         white_tolerance_distance=tolerance_distance,
         white_within_tolerance=within_tolerance,
+        backlight_temp_c_start=as_float(data.get("backlight_temp_c_start")),
+        backlight_temp_c_end=as_float(data.get("backlight_temp_c_end")),
+        backlight_temp_c_avg=as_float(data.get("backlight_temp_c_avg")),
+        backlight_temp_source=str(data.get("backlight_temp_source") or ""),
+        color_backlight_temps=color_backlight_temps,
     )
 
 
@@ -2310,17 +2325,18 @@ def render_gamut(
             white_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
         if gamut.white_tolerance_distance is not None:
             white_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
-        annotation = "\n".join(" | ".join(parts) for parts in (coverage_parts, white_parts) if parts)
+        temp_parts = gamut_temperature_annotation_parts(gamut)
+        annotation = "\n".join(" | ".join(parts) for parts in (coverage_parts, white_parts, temp_parts) if parts)
         if annotation:
             ax.text(
                 0.98,
                 0.055,
                 annotation,
                 transform=ax.transAxes,
-                fontsize=5.55,
+                fontsize=5.4,
                 color="#4F5965",
                 ha="right",
-                linespacing=1.15,
+                linespacing=1.12,
                 bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2},
             )
 
@@ -2331,6 +2347,44 @@ def render_gamut(
     if render_mode == "advanced":
         ax.set_aspect("auto", adjustable="box")
     ax.legend(loc="upper right", fontsize=5.7, frameon=False)
+
+
+def gamut_temperature_annotation_parts(gamut: GamutMetrics) -> list[str]:
+    start = gamut.backlight_temp_c_start
+    end = gamut.backlight_temp_c_end
+    avg = gamut.backlight_temp_c_avg
+    if avg is None and gamut.color_backlight_temps:
+        temps = list(gamut.color_backlight_temps.values())
+        avg = sum(temps) / len(temps)
+        start = min(temps) if start is None else start
+        end = max(temps) if end is None else end
+    if start is None and end is None and avg is None:
+        return []
+
+    parts = []
+    if start is not None and end is not None:
+        if abs(start - end) < 0.05:
+            parts.append(f"temp {format_temp_c(start)}C")
+        else:
+            parts.append(f"temp {format_temp_c(start)}->{format_temp_c(end)}C")
+    elif avg is not None:
+        parts.append(f"temp avg {format_temp_c(avg)}C")
+    elif start is not None:
+        parts.append(f"temp start {format_temp_c(start)}C")
+    elif end is not None:
+        parts.append(f"temp end {format_temp_c(end)}C")
+
+    if avg is not None and (start is not None or end is not None):
+        parts.append(f"avg {format_temp_c(avg)}C")
+    return parts
+
+
+def format_temp_c(value: float) -> str:
+    if value >= 0:
+        rounded = math.floor(value * 10.0 + 0.5) / 10.0
+    else:
+        rounded = math.ceil(value * 10.0 - 0.5) / 10.0
+    return f"{rounded:.1f}"
 
 
 def render_advanced_chromaticity_background(ax: plt.Axes, warnings: list[str]) -> None:
