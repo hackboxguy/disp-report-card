@@ -15,6 +15,7 @@ from src.display_report_card import (
     series_labels,
     thermal_duration_minutes,
     thermal_final_d65_tolerance_multiple,
+    thermal_tolerance_exit,
 )
 
 
@@ -417,6 +418,39 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         )
 
         self.assertAlmostEqual(thermal_final_d65_tolerance_multiple(profile, reference_white), 2.5)
+
+    def test_thermal_tolerance_exit_interpolates_first_boundary_crossing(self) -> None:
+        reference_white = REFERENCE_GAMUTS["ntsc"]["w"]
+        profile = ThermalLuminanceProfile(
+            source="raw/thermal-luminance-profile.csv",
+            metadata={},
+            samples=[
+                ThermalLuminanceSample(1, "", 0.0, 100.0, reference_white[0], reference_white[1], 30.0),
+                ThermalLuminanceSample(2, "", 60.0, 90.0, reference_white[0] + 0.020, reference_white[1], 60.0),
+            ],
+        )
+
+        tolerance_exit = thermal_tolerance_exit(profile, reference_white)
+
+        self.assertIsNotNone(tolerance_exit)
+        assert tolerance_exit is not None
+        self.assertAlmostEqual(tolerance_exit.x_chromaticity, reference_white[0] + 0.010)
+        self.assertAlmostEqual(tolerance_exit.y_chromaticity, reference_white[1])
+        self.assertAlmostEqual(tolerance_exit.backlight_temp_c, 45.0)
+        self.assertAlmostEqual(tolerance_exit.elapsed_seconds, 30.0)
+
+    def test_thermal_tolerance_exit_ignores_runs_starting_outside_tolerance(self) -> None:
+        reference_white = REFERENCE_GAMUTS["ntsc"]["w"]
+        profile = ThermalLuminanceProfile(
+            source="raw/thermal-luminance-profile.csv",
+            metadata={},
+            samples=[
+                ThermalLuminanceSample(1, "", 0.0, 100.0, reference_white[0] + 0.020, reference_white[1], 30.0),
+                ThermalLuminanceSample(2, "", 60.0, 90.0, reference_white[0] + 0.030, reference_white[1], 60.0),
+            ],
+        )
+
+        self.assertIsNone(thermal_tolerance_exit(profile, reference_white))
 
     def test_comparison_mode_highlights_result_changes_and_renders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

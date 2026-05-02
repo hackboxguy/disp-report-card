@@ -234,6 +234,14 @@ class ThermalLuminanceProfile:
 
 
 @dataclass
+class ThermalToleranceExit:
+    x_chromaticity: float
+    y_chromaticity: float
+    backlight_temp_c: float | None
+    elapsed_seconds: float | None
+
+
+@dataclass
 class RunData:
     run_dir: Path
     summary: dict[str, Any]
@@ -1881,6 +1889,8 @@ def render_thermal_white_point_drift(
     ax.legend(loc="upper left", fontsize=5.4, frameon=False)
 
     summary_profile = profile or base_profile
+    if profile is not None:
+        add_thermal_tolerance_exit_marker(ax, profile, reference_white)
     if summary_profile is not None:
         add_thermal_runtime_badge(ax, summary_profile)
         add_thermal_summary_badge(ax, summary_profile, reference_white)
@@ -2066,6 +2076,43 @@ def add_thermal_runtime_badge(ax: plt.Axes, profile: ThermalLuminanceProfile) ->
     )
 
 
+def add_thermal_tolerance_exit_marker(
+    ax: plt.Axes,
+    profile: ThermalLuminanceProfile,
+    reference_white: tuple[float, float],
+) -> None:
+    tolerance_exit = thermal_tolerance_exit(profile, reference_white)
+    if tolerance_exit is None:
+        return
+    ax.plot(
+        tolerance_exit.x_chromaticity,
+        tolerance_exit.y_chromaticity,
+        "o",
+        color="#B86A00",
+        markerfacecolor="white",
+        markeredgewidth=0.8,
+        markersize=3.8,
+        zorder=8,
+        label="_nolegend_",
+    )
+    label = "tol exit"
+    if tolerance_exit.backlight_temp_c is not None:
+        label += f" ~{tolerance_exit.backlight_temp_c:.1f}C"
+    ax.annotate(
+        label,
+        xy=(tolerance_exit.x_chromaticity, tolerance_exit.y_chromaticity),
+        xytext=(5, 5),
+        textcoords="offset points",
+        fontsize=5.2,
+        color="#8A5200",
+        ha="left",
+        va="bottom",
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.74, "pad": 0.7},
+        zorder=9,
+        annotation_clip=True,
+    )
+
+
 def thermal_final_d65_tolerance_multiple(
     profile: ThermalLuminanceProfile,
     reference_white: tuple[float, float],
@@ -2074,7 +2121,75 @@ def thermal_final_d65_tolerance_multiple(
     if not profile.samples or tolerance <= 0:
         return None
     end = profile.samples[-1]
-    return xy_distance((end.x_chromaticity, end.y_chromaticity), reference_white) / tolerance
+    return white_tolerance_distance((end.x_chromaticity, end.y_chromaticity), reference_white, tolerance)
+
+
+def thermal_tolerance_exit(
+    profile: ThermalLuminanceProfile,
+    reference_white: tuple[float, float],
+    tolerance: float = DEFAULT_WHITE_TOLERANCE,
+) -> ThermalToleranceExit | None:
+    if len(profile.samples) < 2 or tolerance <= 0:
+        return None
+    prev = profile.samples[0]
+    prev_distance = white_tolerance_distance((prev.x_chromaticity, prev.y_chromaticity), reference_white, tolerance)
+    if prev_distance is None or prev_distance > 1.0:
+        return None
+    for sample in profile.samples[1:]:
+        sample_distance = white_tolerance_distance((sample.x_chromaticity, sample.y_chromaticity), reference_white, tolerance)
+        if sample_distance is None:
+            return None
+        if prev_distance <= 1.0 < sample_distance:
+            fraction = thermal_tolerance_exit_fraction(prev, sample, reference_white, tolerance)
+            if fraction is None:
+                fraction = (1.0 - prev_distance) / (sample_distance - prev_distance)
+            return ThermalToleranceExit(
+                x_chromaticity=interpolate_value(prev.x_chromaticity, sample.x_chromaticity, fraction),
+                y_chromaticity=interpolate_value(prev.y_chromaticity, sample.y_chromaticity, fraction),
+                backlight_temp_c=interpolate_optional(prev.backlight_temp_c, sample.backlight_temp_c, fraction),
+                elapsed_seconds=interpolate_optional(prev.elapsed_seconds, sample.elapsed_seconds, fraction),
+            )
+        prev = sample
+        prev_distance = sample_distance
+    return None
+
+
+def thermal_tolerance_exit_fraction(
+    start: ThermalLuminanceSample,
+    end: ThermalLuminanceSample,
+    reference_white: tuple[float, float],
+    tolerance: float,
+) -> float | None:
+    start_x = (start.x_chromaticity - reference_white[0]) / tolerance
+    start_y = (start.y_chromaticity - reference_white[1]) / (tolerance * 1.2)
+    end_x = (end.x_chromaticity - reference_white[0]) / tolerance
+    end_y = (end.y_chromaticity - reference_white[1]) / (tolerance * 1.2)
+    delta_x = end_x - start_x
+    delta_y = end_y - start_y
+    a = delta_x * delta_x + delta_y * delta_y
+    b = 2.0 * (start_x * delta_x + start_y * delta_y)
+    c = start_x * start_x + start_y * start_y - 1.0
+    if a <= 0:
+        return None
+    discriminant = b * b - 4.0 * a * c
+    if discriminant < 0:
+        return None
+    root = math.sqrt(discriminant)
+    candidates = [(-b - root) / (2.0 * a), (-b + root) / (2.0 * a)]
+    valid = [value for value in candidates if -1e-9 <= value <= 1.0 + 1e-9]
+    if not valid:
+        return None
+    return min(max(value, 0.0) for value in valid)
+
+
+def interpolate_value(start: float, end: float, fraction: float) -> float:
+    return start + (end - start) * fraction
+
+
+def interpolate_optional(start: float | None, end: float | None, fraction: float) -> float | None:
+    if start is None or end is None:
+        return None
+    return interpolate_value(start, end, fraction)
 
 
 def thermal_duration_minutes(profile: ThermalLuminanceProfile) -> float | None:
