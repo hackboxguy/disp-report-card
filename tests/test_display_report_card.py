@@ -243,6 +243,79 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(run.brightness.expected_luminance, [0.0, 900.0])
         self.assertTrue(any("artifact not found" in warning for warning in run.warnings))
 
+    def test_brightness_nits_verify_note_uses_artifact_peak_delta(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            artifact_dir = run_dir / "artifacts"
+            raw_dir.mkdir()
+            artifact_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "nits-verify"})
+            write_json(
+                raw_dir / "test-brightness-nits-verify.json",
+                {
+                    "test_info": {"name": "test-brightness-nits-verify", "category": "validation"},
+                    "execution": {"result": "FAIL"},
+                    "data": {
+                        "nits_verify_json": "artifacts/brightness-nits-verify.json",
+                        "samples_compared": 3,
+                        "samples_failed": 2,
+                    },
+                },
+            )
+            write_json(
+                artifact_dir / "brightness-nits-verify.json",
+                {
+                    "schema_version": "1.0",
+                    "samples_compared": 3,
+                    "samples_failed": 2,
+                    "samples": [
+                        {"brightness_percent": 0, "delta_pct": None, "comparison": "skipped_below_floor"},
+                        {"brightness_percent": 10, "delta_pct": 3.330, "comparison": "fail"},
+                        {"brightness_percent": 20, "delta_pct": 3.177, "comparison": "fail"},
+                        {"brightness_percent": 30, "delta_pct": 1.115, "comparison": "pass"},
+                    ],
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        nits_row = next(row for row in run.status_rows if row.name == "test-brightness-nits-verify")
+        self.assertEqual(nits_row.result, "FAIL")
+        self.assertEqual(nits_row.note, "max 3.33%@10%,2/3")
+
+    def test_brightness_nits_verify_note_falls_back_to_log_delta(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            raw_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "nits-verify-log"})
+            write_json(
+                raw_dir / "test-brightness-nits-verify.json",
+                {
+                    "test_info": {"name": "test-brightness-nits-verify", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {},
+                },
+            )
+            (raw_dir / "test-brightness-nits-verify.log").write_text(
+                "\n".join(
+                    [
+                        "[11:40:28] [2/11] Brightness 10%...",
+                        "[11:40:29]   PASS: nits_als=105.0, Y_meas=108.6, delta=3.330% (<= 4.0%)",
+                        "[11:40:29] [3/11] Brightness 20%...",
+                        "[11:40:31]   PASS: nits_als=213.8, Y_meas=220.8, delta=3.177% (<= 4.0%)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        nits_row = next(row for row in run.status_rows if row.name == "test-brightness-nits-verify")
+        self.assertEqual(nits_row.result, "PASS")
+        self.assertEqual(nits_row.note, "max 3.33%@10%")
+
     def test_local_dimming_apl_artifact_preserves_skipped_steps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             run_dir = Path(temp_dir)

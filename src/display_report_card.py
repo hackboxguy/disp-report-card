@@ -8,6 +8,7 @@ import csv
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass, field
@@ -531,6 +532,11 @@ def build_status_note(test: RawTest) -> str:
         if total is not None:
             return f"{total} samples"
 
+    if test.name == "test-brightness-nits-verify":
+        note = build_brightness_nits_verify_note(test)
+        if note:
+            return note
+
     if test.name == "test-color-gamut":
         successful = as_int(data.get("successful_colors"))
         total = as_int(data.get("total_colors"))
@@ -582,6 +588,104 @@ def build_status_note(test: RawTest) -> str:
     if test.result == "SKIP":
         return "skipped"
     return ""
+
+
+def build_brightness_nits_verify_note(test: RawTest) -> str:
+    note = brightness_nits_verify_note_from_artifact(test)
+    if note:
+        return note
+    return brightness_nits_verify_note_from_log(test)
+
+
+def brightness_nits_verify_note_from_artifact(test: RawTest) -> str:
+    run_dir = test.path.parent.parent
+    recorded_json = str(get_nested(test.data, "data", "nits_verify_json", default="") or "")
+    artifact_path, _warnings = resolve_artifact_path(
+        run_dir,
+        test.path,
+        recorded_json,
+        "artifacts/brightness-nits-verify.json",
+    )
+    if artifact_path is None:
+        return ""
+    try:
+        artifact = load_json(artifact_path)
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+    peak = brightness_nits_verify_peak_sample(artifact.get("samples") or [])
+    if peak is None:
+        return ""
+    peak_delta, peak_brightness = peak
+    failed = as_int(artifact.get("samples_failed"))
+    compared = as_int(artifact.get("samples_compared"))
+    return format_brightness_nits_verify_note(peak_delta, peak_brightness, failed, compared)
+
+
+def brightness_nits_verify_peak_sample(samples: list[Any]) -> tuple[float, float | None] | None:
+    peak_delta: float | None = None
+    peak_brightness: float | None = None
+    for sample in samples:
+        if not isinstance(sample, dict):
+            continue
+        delta = as_float(sample.get("delta_pct"))
+        if delta is None:
+            continue
+        abs_delta = abs(delta)
+        if peak_delta is None or abs_delta > peak_delta:
+            peak_delta = abs_delta
+            peak_brightness = as_float(sample.get("brightness_percent"))
+    if peak_delta is None:
+        return None
+    return peak_delta, peak_brightness
+
+
+def brightness_nits_verify_note_from_log(test: RawTest) -> str:
+    log_path = test.path.with_suffix(".log")
+    try:
+        lines = log_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+
+    current_brightness: float | None = None
+    peak_delta: float | None = None
+    peak_brightness: float | None = None
+    compared = 0
+    failed = 0
+    brightness_pattern = re.compile(r"Brightness\s+([0-9.]+)%")
+    delta_pattern = re.compile(r"\b(PASS|FAIL):.*?\bdelta=([0-9.]+)%")
+    for line in lines:
+        brightness_match = brightness_pattern.search(line)
+        if brightness_match:
+            current_brightness = as_float(brightness_match.group(1))
+        delta_match = delta_pattern.search(line)
+        if not delta_match:
+            continue
+        delta = as_float(delta_match.group(2))
+        if delta is None:
+            continue
+        compared += 1
+        if delta_match.group(1) == "FAIL":
+            failed += 1
+        if peak_delta is None or delta > peak_delta:
+            peak_delta = delta
+            peak_brightness = current_brightness
+    if peak_delta is None:
+        return ""
+    return format_brightness_nits_verify_note(peak_delta, peak_brightness, failed, compared)
+
+
+def format_brightness_nits_verify_note(
+    peak_delta: float,
+    peak_brightness: float | None,
+    failed: int | None,
+    compared: int | None,
+) -> str:
+    brightness = f"@{peak_brightness:g}%" if peak_brightness is not None else ""
+    note = f"max {peak_delta:.2f}%{brightness}"
+    if failed and failed > 0 and compared:
+        note += f",{failed}/{compared}"
+    return note
 
 
 def comparison_status_rows(run: RunData, base_run: RunData | None) -> list[StatusRow]:
@@ -1368,9 +1472,9 @@ def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
     row_h = (0.97 - header_h) / max(len(rows), 1)
     columns = [
         ("Test", 0.02, 0.47),
-        ("Category", 0.49, 0.17),
-        ("Result", 0.67, 0.13),
-        ("Note", 0.81, 0.17),
+        ("Category", 0.48, 0.16),
+        ("Result", 0.65, 0.13),
+        ("Note", 0.78, 0.20),
     ]
     ax.add_patch(Rectangle((0, 1 - header_h), 1, header_h, facecolor="#EDF2F6", edgecolor="#D3DCE5", linewidth=0.8))
     for label, x, _width in columns:
@@ -1385,12 +1489,12 @@ def render_status_matrix(ax: plt.Axes, rows: list[StatusRow]) -> None:
         if changed:
             ax.add_patch(Rectangle((0, y), 0.006, row_h, facecolor="#D99028", edgecolor="#D99028", linewidth=0))
         ax.text(0.02, y + row_h * 0.52, shorten(row.name.replace("test-", ""), 30), va="center", fontsize=6.45, color="#18222D")
-        ax.text(0.49, y + row_h * 0.52, row.category, va="center", fontsize=6.1, color="#5C6875")
+        ax.text(0.48, y + row_h * 0.52, row.category, va="center", fontsize=6.1, color="#5C6875")
 
         color = STATUS_COLORS.get(row.result, "#5B6472")
-        ax.add_patch(Rectangle((0.67, y + row_h * 0.22), 0.105, row_h * 0.56, facecolor=color, edgecolor=color, linewidth=0))
-        ax.text(0.722, y + row_h * 0.51, row.result, ha="center", va="center", fontsize=5.6, color="white", weight="bold")
-        ax.text(0.81, y + row_h * 0.52, shorten(row.note, 22), va="center", fontsize=5.9, color="#47515D", clip_on=True)
+        ax.add_patch(Rectangle((0.65, y + row_h * 0.22), 0.105, row_h * 0.56, facecolor=color, edgecolor=color, linewidth=0))
+        ax.text(0.702, y + row_h * 0.51, row.result, ha="center", va="center", fontsize=5.6, color="white", weight="bold")
+        ax.text(0.78, y + row_h * 0.52, shorten(row.note, 24), va="center", fontsize=5.6, color="#47515D", clip_on=True)
 
 
 def render_brightness(
