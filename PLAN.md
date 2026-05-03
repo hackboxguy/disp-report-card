@@ -18,6 +18,10 @@
 - Done: add comparison mode for baseline/run overlays and changed-test highlighting.
 - Done: add comparison label overrides for concise firmware labels in plots.
 - Done: add optional thermal white-point drift rendering from live thermal luminance CSV.
+- Done: add brightness-nits-verify pass/fail status metric with peak delta extraction.
+- Done: add thermal D65 tolerance multiple and tolerance-exit marker.
+- Done: add gamut backlight temperature parsing and rendering.
+- Done: refresh the 15.6" sample fixture to the v5 run with current artifacts.
 - Next: add future soak/stability artifact support when the tester artifact is available.
 
 ## Phase 1: Loader And Metadata
@@ -40,7 +44,10 @@
 - Done: extract gamma curve from `test-gamma-curve.json` and the current CSV artifact.
 - Done: extract contrast measurements, including partial data from `ERROR` tests.
 - Done: extract gamut and white-point metrics, including reference coverage and D65 tolerance distance.
+- Done: extract optional gamut backlight temperature metadata.
 - Done: extract local-dimming APL sweep metrics, including skipped APL steps.
+- Done: extract brightness-nits-verify peak delta from the structured artifact, with log fallback.
+- Done: extract thermal white-point drift samples from `raw/thermal-luminance-profile.csv`.
 
 ## Phase 3: Report Rendering
 
@@ -53,7 +60,10 @@
   - gamma
   - contrast
   - gamut / white point with NTSC reference, coverage, and D65 tolerance
-- Done: add local-dimming APL as a fifth chart panel spanning the bottom of the chart area.
+- Done: add local-dimming APL as a bottom-row chart panel.
+- Done: add thermal white-point drift as an optional bottom-row chart panel when thermal data is present.
+- Done: add D65 tolerance exit label and final tolerance multiple to the thermal drift panel.
+- Done: add gamut temperature range/average to the gamut metric badge when provided by the test run.
 - Done: add optional advanced gamut rendering mode for host PCs.
 - Done: add footer observations when soak data is unavailable.
 
@@ -62,7 +72,8 @@
 - Done: generate a report for `test-data/12-3-nq1v1`.
 - Done: generate a report for `test-data/15-6-0od`.
 - Done: verify the gamma path fallback works despite Pi-side absolute paths in JSON.
-- Done: verify the 15.6" contrast panel renders partial data while the matrix shows `ERROR`.
+- Done: verify legacy partial contrast data can render while the matrix shows `ERROR`.
+- Done: verify the current 15.6" v5 fixture renders full contrast, APL, thermal drift, gamut temperature, and brightness-nits-verify data.
 - Done: keep fixtures read-only during report generation.
 
 ## Phase 5: Packaging And Documentation
@@ -73,6 +84,7 @@
 - Done: add `pyproject.toml` with `display-report-card` console entry point.
 - Done: add `Makefile` targets for tests and sample report regeneration.
 - Done: add tests for missing `summary.json`, `report-metadata.json` header overrides, missing gamma artifacts, and malformed optional raw JSON.
+- Done: update README and plan notes for comparison mode, current fixtures, thermal drift, brightness-nits-verify, and gamut temperature support.
 - Keep commits scoped to one implementation milestone at a time.
 
 ## Open Implementation Notes
@@ -81,5 +93,5 @@
 - Reuse the parsing and fitting approach from `gamma-tools/visualize-gamma.py`, but render only a compact report-card gamma panel.
 - Reuse the useful gamut ideas from `imagetools/scripts/analyze-2d-gamut.py`, but keep CSV parsing and polygon coverage local for the default Pi-friendly path.
 - `--render advanced` may use optional host-PC packages such as `colour-science`; it must warn and fall back gracefully when they are not installed.
-- Do not parse logs except as an explicit backward-compatibility fallback for brightness calibration.
+- Avoid log parsing except for explicit backward-compatibility fallbacks such as brightness-nits-verify when its artifact is missing.
 - Do not mutate input run folders.

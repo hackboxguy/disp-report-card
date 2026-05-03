@@ -4,13 +4,15 @@ Display test result analyzer and report-card generator.
 
 ## Goal
 
-Generate one lightweight A4 landscape PNG report card from one automated display test result folder.
+Generate one lightweight A4 landscape PNG report card from an automated display test result folder,
+with optional baseline/run overlay comparison.
 
-The first implementation is per-run only. Cross-run comparison, dashboards, PDF output, and heavy report dependencies are out of scope for v1.
+Dashboards, PDF output, trend-history storage, and heavy runtime dependencies are out of scope for
+the current tool.
 
 ## Repository Layout
 
-- `prd/` - product requirements and tester-extension notes.
+- `prd/` - historical product requirements and tester-extension notes.
 - `src/` - report-card implementation.
 - `test-data/12-3-nq1v1/` - latest 12.3" display fixture run.
 - `test-data/15-6-0od/` - latest 15.6" display fixture run.
@@ -18,8 +20,8 @@ The first implementation is per-run only. Cross-run comparison, dashboards, PDF 
 
 ## Current Fixture Runs
 
-- `test-data/12-3-nq1v1`: 22 tests, 17 pass, 3 skip, 2 errors.
-- `test-data/15-6-0od`: 20 tests, 16 pass, 2 skip, 2 errors.
+- `test-data/12-3-nq1v1`: 22 tests, 17 pass, 0 failed, 2 errors, 3 skipped.
+- `test-data/15-6-0od`: 23 tests, 19 pass, 0 failed, 1 error, 3 skipped.
 
 Both fixtures include the current gamma extension:
 
@@ -27,19 +29,25 @@ Both fixtures include the current gamma extension:
 - `artifacts/gamma_curve_test-gamma-curve.csv`
 - `artifacts/gamma_curve_test-gamma-curve_inverse_lut.csv`
 
-The 12.3" fixture includes a fresh structured 81-step brightness calibration artifact. When present,
-the report uses the structured calibration artifact before falling
-back to the 9-point brightness-linearity data:
+Both fixtures include a structured 81-step brightness calibration artifact. When present, the report
+uses the structured calibration artifact before falling back to the older brightness-linearity data:
 
 - `raw/test-brightness-calibration.json`
 - `artifacts/brightness-calibration-81step.json`
 - `artifacts/brightness-calibration-81step.csv`
 
-The 12.3" fixture also includes the local-dimming APL extension:
+Both fixtures include the local-dimming APL extension:
 
 - `raw/test-local-dimming-apl.json`
 - `artifacts/local-dimming-apl-sweep.json`
 - `artifacts/local-dimming-apl-sweep.csv`
+
+The 15.6" fixture is the current v5 sample run. It also includes:
+
+- `raw/test-brightness-nits-verify.json`
+- `artifacts/brightness-nits-verify.json`
+- `raw/thermal-luminance-profile.csv`
+- gamut backlight temperature metadata in `raw/test-color-gamut.json`
 
 ## Usage
 
@@ -77,29 +85,36 @@ Options:
 
 The default gamut panel uses NTSC 1953 primaries with D65 white. It reports reference coverage,
 relative measured area, measured white-point offset, and distance against the default D65 tolerance
-ellipse of `0.010`.
+ellipse of `0.010`. If gamut backlight temperature metadata is present, the panel also reports the
+temperature range and average during the gamut sweep.
 
 When `raw/thermal-luminance-profile.csv` is present, the bottom chart row splits to add a
 `Thermal White-Point Drift` panel. That panel shows the display white-point path during warm-up in
-a zoomed CIE xy view with D65 tolerance, an NTSC context inset, start/end temperature labels, and
-luminance drop summary.
+a zoomed CIE xy view with D65 tolerance, start/end temperature and luminance labels, runtime,
+final D65 tolerance multiple, luminance drop summary, and the interpolated tolerance-exit
+temperature when the run starts inside tolerance and later exits.
+
+When `test-brightness-nits-verify` is present, the test matrix reports its pass/fail state and the
+peak nits delta, for example `max 3.44%@20%`.
 
 ### Comparison Mode
 
 Comparison mode overlays a baseline run and the current run on shared chart scales. FPGA labels
-come from `raw/test-version-read.json`.
+come from `raw/test-version-read.json`. Use two different run folders for a real firmware or panel
+comparison; the example below uses the tracked 15.6" fixture as both inputs as a copy-paste smoke
+test.
 
 ```bash
 python3 src/display_report_card.py \
-  --base-input test-data/12-3-nq1v1 \
-  --input test-data/12-3-nq1v1-03 \
-  --output out/12-3-v02-v03-compare.png
+  --base-input test-data/15-6-0od \
+  --input test-data/15-6-0od \
+  --output out/15-6-self-compare.png
 
-make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03 \
-  OUT=out/12-3-v02-v03-compare.png
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
+  OUT=out/15-6-self-compare.png
 
-make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03 \
-  BASE_LABEL=v02 RUN_LABEL=v03 OUT=out/12-3-v02-v03-compare.png
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
+  BASE_LABEL=baseline RUN_LABEL=current OUT=out/15-6-self-compare.png
 ```
 
 The test matrix remains run-focused and highlights result changes from the baseline. If labels are
@@ -112,7 +127,7 @@ make test
 
 make test-data/12-3-nq1v1
 make report-samples
-make compare BASE=test-data/12-3-nq1v1 RUN=test-data/12-3-nq1v1-03
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od
 make report-samples-advanced PYTHON=.venv/bin/python
 make clean
 ```
