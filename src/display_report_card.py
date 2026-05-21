@@ -1386,8 +1386,9 @@ def render_report_card(
     ax_contrast = fig.add_subplot(chart_grid[1, 0])
     ax_gamut = fig.add_subplot(chart_grid[1, 1])
     has_thermal_profile = run.thermal_profile is not None or (base_run is not None and base_run.thermal_profile is not None)
-    ax_local_dimming_apl = fig.add_subplot(chart_grid[2, 0] if has_thermal_profile else chart_grid[2, :])
-    ax_thermal = fig.add_subplot(chart_grid[2, 1]) if has_thermal_profile else None
+    has_white_point_detail = has_thermal_profile or gamut_has_white_point(run.gamut) or (base_run is not None and gamut_has_white_point(base_run.gamut))
+    ax_local_dimming_apl = fig.add_subplot(chart_grid[2, 0] if has_white_point_detail else chart_grid[2, :])
+    ax_white_point_detail = fig.add_subplot(chart_grid[2, 1]) if has_white_point_detail else None
     ax_footer = fig.add_subplot(grid[3, :])
 
     labels = series_labels(run, base_run, run_label, base_label)
@@ -1403,14 +1404,16 @@ def render_report_card(
         run.local_dimming_apl,
         base_run.local_dimming_apl if base_run else None,
         labels,
-        compact=has_thermal_profile,
+        compact=has_white_point_detail,
     )
-    if ax_thermal is not None:
+    if ax_white_point_detail is not None:
         render_thermal_white_point_drift(
-            ax_thermal,
+            ax_white_point_detail,
             run.thermal_profile,
             base_run.thermal_profile if base_run else None,
             labels,
+            run.gamut,
+            base_run.gamut if base_run else None,
         )
     render_footer(ax_footer, run, base_run)
 
@@ -1872,13 +1875,15 @@ def render_thermal_white_point_drift(
     profile: ThermalLuminanceProfile | None,
     base_profile: ThermalLuminanceProfile | None = None,
     labels: SeriesLabels | None = None,
+    gamut: GamutMetrics | None = None,
+    base_gamut: GamutMetrics | None = None,
 ) -> None:
-    style_chart(ax, "Thermal White-Point Drift")
     labels = labels or SeriesLabels(run="measured", base="base")
     if profile is None and base_profile is None:
-        placeholder(ax, "No thermal white-point data")
+        render_white_point_zoom(ax, gamut, base_gamut, labels)
         return
 
+    style_chart(ax, "Thermal White-Point Drift")
     reference = REFERENCE_GAMUTS["ntsc"]
     reference_white = reference["w"]
     all_samples: list[ThermalLuminanceSample] = []
@@ -1909,6 +1914,94 @@ def render_thermal_white_point_drift(
     if summary_profile is not None:
         add_thermal_runtime_badge(ax, summary_profile)
         add_thermal_summary_badge(ax, summary_profile, reference_white)
+
+
+def gamut_has_white_point(gamut: GamutMetrics | None) -> bool:
+    return gamut is not None and gamut.white_point is not None
+
+
+def render_white_point_zoom(
+    ax: plt.Axes,
+    gamut: GamutMetrics | None,
+    base_gamut: GamutMetrics | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
+    style_chart(ax, "White-Point / D65 Zoom")
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if not gamut_has_white_point(gamut) and not gamut_has_white_point(base_gamut):
+        placeholder(ax, "No white-point data")
+        return
+
+    reference_white = (
+        (gamut.reference_white if gamut else None)
+        or (base_gamut.reference_white if base_gamut else None)
+        or REFERENCE_GAMUTS["ntsc"]["w"]
+    )
+    white_points = []
+    if base_gamut is not None and base_gamut.white_point is not None:
+        white_points.append(base_gamut.white_point)
+    if gamut is not None and gamut.white_point is not None:
+        white_points.append(gamut.white_point)
+    x_min, x_max, y_min, y_max = thermal_zoom_limits(
+        [point[0] for point in white_points],
+        [point[1] for point in white_points],
+        reference_white,
+    )
+
+    draw_white_reference(ax, reference_white, "D65", DEFAULT_WHITE_TOLERANCE)
+    if base_gamut is not None and base_gamut.white_point is not None:
+        ax.plot(
+            base_gamut.white_point[0],
+            base_gamut.white_point[1],
+            "o",
+            markerfacecolor="white",
+            markeredgecolor=BASELINE_COLOR,
+            markersize=4.0,
+            label=f"{labels.base} white",
+            zorder=6,
+        )
+    if gamut is not None and gamut.white_point is not None:
+        ax.plot(
+            gamut.white_point[0],
+            gamut.white_point[1],
+            "o",
+            color="#0072B2",
+            markersize=4.0,
+            label=f"{labels.run} white",
+            zorder=7,
+        )
+        add_white_point_zoom_badge(ax, gamut)
+
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_aspect("auto", adjustable="box")
+    ax.set_xlabel("CIE x", fontsize=6.4)
+    ax.set_ylabel("CIE y", fontsize=6.4)
+    ax.legend(loc="upper left", fontsize=5.4, frameon=False)
+
+
+def add_white_point_zoom_badge(ax: plt.Axes, gamut: GamutMetrics) -> None:
+    if gamut.white_point is None:
+        return
+    d65_distance = xy_distance(gamut.white_point, gamut.reference_white)
+    parts = [f"dD65 {d65_distance:.4f}"]
+    if gamut.white_tolerance_distance is not None:
+        parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
+    if gamut.white_delta is not None:
+        parts.append(f"dx {gamut.white_delta[0]:+.4f}")
+        parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+    ax.text(
+        0.985,
+        0.025,
+        " | ".join(parts[:2]) + ("\n" + " | ".join(parts[2:]) if len(parts) > 2 else ""),
+        transform=ax.transAxes,
+        fontsize=5.35,
+        color="#3D4650",
+        ha="right",
+        va="bottom",
+        linespacing=1.15,
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.1},
+    )
 
 
 def draw_white_reference(

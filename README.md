@@ -93,6 +93,8 @@ When `raw/thermal-luminance-profile.csv` is present, the bottom chart row splits
 a zoomed CIE xy view with D65 tolerance, start/end temperature and luminance labels, runtime,
 final D65 tolerance multiple, luminance drop summary, and the interpolated tolerance-exit
 temperature when the run starts inside tolerance and later exits.
+When thermal drift data is absent but gamut white-point data is available, the same slot renders a
+`White-Point / D65 Zoom` panel with D65, the tolerance ellipse, and the measured white point.
 
 When `test-brightness-nits-verify` is present, the test matrix reports its pass/fail state and the
 peak nits delta, for example `max 3.44%@20%`.

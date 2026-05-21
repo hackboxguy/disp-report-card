@@ -134,6 +134,35 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertEqual(run.gamut.color_backlight_temps["B"], 43.5)
         self.assertEqual(gamut_temperature_annotation_parts(run.gamut), ["temp 40.6->43.5C", "avg 42.1C"])
 
+    def test_white_point_zoom_renders_without_thermal_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "run"
+            raw_dir = run_dir / "raw"
+            raw_dir.mkdir(parents=True)
+            write_json(run_dir / "summary.json", {"run_id": "white-point-only"})
+            write_json(
+                raw_dir / "test-color-gamut.json",
+                {
+                    "test_info": {"name": "test-color-gamut", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {
+                        "gamut_data": [
+                            {"color": "W", "Y_luminance": 900, "x_chromaticity": 0.304, "y_chromaticity": 0.322},
+                            {"color": "R", "x_chromaticity": 0.68, "y_chromaticity": 0.32},
+                            {"color": "G", "x_chromaticity": 0.23, "y_chromaticity": 0.71},
+                            {"color": "B", "x_chromaticity": 0.14, "y_chromaticity": 0.08},
+                        ],
+                    },
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+            output = Path(temp_dir) / "white-point-zoom.png"
+            render_report_card(run, output, "Display Test Report Card", 72, "ntsc", "basic")
+
+            self.assertIsNone(run.thermal_profile)
+            self.assertTrue(output.exists())
+
     def test_missing_summary_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(FileNotFoundError):

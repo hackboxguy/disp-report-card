@@ -62,6 +62,7 @@
   - gamut / white point with NTSC reference, coverage, and D65 tolerance
 - Done: add local-dimming APL as a bottom-row chart panel.
 - Done: add thermal white-point drift as an optional bottom-row chart panel when thermal data is present.
+- Done: add a static white-point / D65 zoom panel when thermal drift data is missing.
 - Done: add D65 tolerance exit label and final tolerance multiple to the thermal drift panel.
 - Done: add gamut temperature range/average to the gamut metric badge when provided by the test run.
 - Done: add optional advanced gamut rendering mode for host PCs.
