@@ -166,6 +166,7 @@ class ContrastCurve:
     contrast_ratio: list[float]
     contrast_display: list[str]
     lower_bound: list[bool]
+    min_spec: float | None
     result: str
     errors: list[str]
 
@@ -1047,6 +1048,7 @@ def extract_contrast(tests: dict[str, RawTest]) -> ContrastCurve | None:
         contrast_ratio=ratios,
         contrast_display=displays,
         lower_bound=lower_bounds,
+        min_spec=as_float(data.get("min_contrast_spec")),
         result=test.result,
         errors=[str(error) for error in (test.data.get("errors") or [])],
     )
@@ -1691,52 +1693,114 @@ def render_contrast(
     base_contrast: ContrastCurve | None = None,
     labels: SeriesLabels | None = None,
 ) -> None:
-    style_chart(ax, "Contrast")
+    style_chart(ax, "Sequential Contrast Floor")
     labels = labels or SeriesLabels(run="measured", base="base")
     if contrast is None and base_contrast is None:
         placeholder(ax, "Contrast data not available")
         return
+    spec = contrast.min_spec if contrast is not None else None
+    if spec is None and base_contrast is not None:
+        spec = base_contrast.min_spec
+    if spec is not None and spec > 0:
+        ax.axhline(spec, color="#8B949E", linewidth=0.8, linestyle=":", zorder=1)
+        ax.text(1.5, spec * 1.08, f"spec {spec:.0f}:1", fontsize=5.8, color="#5B6472", va="bottom")
     if base_contrast is not None:
         ax.plot(
             base_contrast.brightness,
             base_contrast.contrast_ratio,
-            "o--",
+            "--",
             color=BASELINE_COLOR,
-            markerfacecolor="white",
             linewidth=1.1,
-            markersize=3.1,
-            label=labels.base,
+            marker=None,
+            label="_nolegend_",
         )
+        render_contrast_markers(ax, base_contrast, BASELINE_COLOR, labels.base, is_base=True)
     if contrast is not None:
-        ax.plot(contrast.brightness, contrast.contrast_ratio, "o-", color="#009E73", linewidth=1.4, markersize=3.8, label=labels.run)
+        ax.plot(contrast.brightness, contrast.contrast_ratio, "-", color="#009E73", linewidth=1.4, marker=None, label="_nolegend_")
+        render_contrast_markers(ax, contrast, "#009E73", labels.run)
     ax.set_xlabel("Brightness command (%)", fontsize=7)
-    ax.set_ylabel("Contrast ratio", fontsize=7)
+    ax.set_ylabel("Minimum contrast ratio", fontsize=7)
     ax.set_xlim(0, 105)
     ax.set_yscale("log")
-    ax.yaxis.set_major_locator(LogLocator(base=10, numticks=4))
+    ax.set_ylim(*contrast_plot_limits(contrast, base_contrast, spec))
+    ax.yaxis.set_major_locator(LogLocator(base=10, numticks=5))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:.0f}:1"))
     ax.yaxis.set_minor_formatter(NullFormatter())
-    if contrast is not None:
-        for x, y, label, lower in zip(
-            contrast.brightness,
-            contrast.contrast_ratio,
-            contrast.contrast_display,
-            contrast.lower_bound,
-        ):
-            text = label if lower and label.startswith(">") else f"{y:.0f}"
-            ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 5), ha="center", fontsize=5.5)
     missing = sorted(set(contrast.expected_levels) - set(contrast.brightness)) if contrast is not None else []
     note_parts = []
     if contrast is not None and any(contrast.lower_bound):
-        note_parts.append("lower bounds")
+        note_parts.append("black below sensor floor")
     if missing:
         note_parts.append("missing " + ", ".join(f"{level:g}%" for level in missing))
     if contrast is not None and contrast.result != "PASS":
         note_parts.append(contrast.result)
     if note_parts:
         ax.text(0.02, 0.94, "; ".join(note_parts), transform=ax.transAxes, fontsize=6.1, color="#C9342F", va="top")
+    summary = contrast_summary(contrast)
+    if summary:
+        ax.text(0.98, 0.05, summary, transform=ax.transAxes, fontsize=6.0, color="#4F5965", ha="right", va="bottom")
     if base_contrast is not None and contrast is not None:
-        ax.legend(loc="lower right", fontsize=5.7, frameon=False)
+        ax.legend(loc="upper right", fontsize=5.7, frameon=False)
+
+
+def render_contrast_markers(
+    ax: plt.Axes,
+    contrast: ContrastCurve,
+    color: str,
+    label: str,
+    is_base: bool = False,
+) -> None:
+    for index, (x, y, text_label, lower) in enumerate(
+        zip(contrast.brightness, contrast.contrast_ratio, contrast.contrast_display, contrast.lower_bound)
+    ):
+        marker = "^" if lower else "o"
+        markerface = "white" if is_base or lower else color
+        ax.plot(
+            [x],
+            [y],
+            marker=marker,
+            color=color,
+            markerfacecolor=markerface,
+            markeredgecolor=color,
+            markersize=3.5 if not is_base else 3.0,
+            linestyle="None",
+            label=label if index == 0 else None,
+            zorder=4,
+        )
+        text = text_label if lower and text_label.startswith(">") else f"{y:.0f}"
+        ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 5), ha="center", fontsize=5.4, color="#111820")
+
+
+def contrast_plot_limits(
+    contrast: ContrastCurve | None,
+    base_contrast: ContrastCurve | None,
+    spec: float | None,
+) -> tuple[float, float]:
+    values: list[float] = [1000.0]
+    if spec is not None and spec > 0:
+        values.append(spec)
+    for curve in (contrast, base_contrast):
+        if curve is not None:
+            values.extend(value for value in curve.contrast_ratio if value > 0)
+    max_value = max(values)
+    upper = 100000.0
+    if max_value > upper:
+        upper = 10 ** math.ceil(math.log10(max_value * 1.25))
+    return 800.0, upper
+
+
+def contrast_summary(contrast: ContrastCurve | None) -> str:
+    if contrast is None or not contrast.contrast_ratio:
+        return ""
+    min_index = min(range(len(contrast.contrast_ratio)), key=contrast.contrast_ratio.__getitem__)
+    min_ratio = contrast.contrast_ratio[min_index]
+    hundred_index = next((index for index, level in enumerate(contrast.brightness) if abs(level - 100.0) < 0.01), None)
+    if hundred_index is None:
+        hundred_index = max(range(len(contrast.brightness)), key=contrast.brightness.__getitem__)
+    hundred_ratio = contrast.contrast_ratio[hundred_index]
+    hundred_prefix = ">" if contrast.lower_bound[hundred_index] else ""
+    min_prefix = ">" if contrast.lower_bound[min_index] else ""
+    return f"min floor {min_prefix}{min_ratio:.0f}:1 | 100% floor {hundred_prefix}{hundred_ratio:.0f}:1"
 
 
 def render_local_dimming_apl(
