@@ -143,6 +143,7 @@ class GammaCurve:
     normalized_input: np.ndarray
     luminance: np.ndarray
     normalized_luminance: np.ndarray
+    normalized_y_std: np.ndarray
     y_std: np.ndarray
     x_chromaticity: np.ndarray
     y_chromaticity: np.ndarray
@@ -151,6 +152,7 @@ class GammaCurve:
     rms_srgb: float | None
     y_black: float
     y_max: float
+    normalization_label: str
     endpoint_drift_percent: float | None
     samples_per_patch: int | None
     warnings: list[str] = field(default_factory=list)
@@ -896,8 +898,13 @@ def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve 
     x_arr = np.asarray(x_chrom, dtype=float)
     y_arr = np.asarray(y_chrom, dtype=float)
 
-    y_black = as_float(get_nested(test.data, "data", "y_black_nits"), float(np.nanmin(lum_arr)))
-    y_max = as_float(get_nested(test.data, "data", "y_max_nits"), float(np.nanmax(lum_arr)))
+    raw_y_black = get_nested(test.data, "data", "y_black_nits")
+    raw_y_max = get_nested(test.data, "data", "y_max_nits")
+    y_black = as_float(raw_y_black, float(np.nanmin(lum_arr)))
+    y_max = as_float(raw_y_max, float(np.nanmax(lum_arr)))
+    y_black_source = "JSON Yb" if as_float(raw_y_black) is not None else "CSV min"
+    y_max_source = "JSON Ymax" if as_float(raw_y_max) is not None else "CSV max"
+    normalization_label = f"norm {y_black_source}/{y_max_source}"
     if y_black is None:
         y_black = float(np.nanmin(lum_arr))
     if y_max is None:
@@ -906,8 +913,10 @@ def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve 
     if denom <= 0:
         warnings.append("gamma normalization denominator is not positive")
         norm_lum = np.zeros_like(lum_arr)
+        norm_y_std = np.zeros_like(y_std_arr)
     else:
         norm_lum = (lum_arr - y_black) / denom
+        norm_y_std = y_std_arr / denom
 
     norm_input = code_arr / 255.0
     gamma = as_float(get_nested(test.data, "data", "gamma"))
@@ -927,6 +936,7 @@ def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve 
             normalized_input=norm_input,
             luminance=lum_arr,
             normalized_luminance=norm_lum,
+            normalized_y_std=norm_y_std,
             y_std=y_std_arr,
             x_chromaticity=x_arr,
             y_chromaticity=y_arr,
@@ -935,6 +945,7 @@ def extract_gamma(run_dir: Path, tests: dict[str, RawTest]) -> tuple[GammaCurve 
             rms_srgb=as_float(get_nested(test.data, "data", "rms_residual_srgb")),
             y_black=y_black,
             y_max=y_max,
+            normalization_label=normalization_label,
             endpoint_drift_percent=endpoint_drift,
             samples_per_patch=as_int(get_nested(test.data, "data", "samples_per_patch")),
             warnings=warnings.copy(),
@@ -1000,6 +1011,11 @@ def fit_gamma(normalized_input: np.ndarray, normalized_luminance: np.ndarray) ->
         return None
     slope, _intercept = np.polyfit(np.asarray(xs), np.asarray(ys), 1)
     return float(slope)
+
+
+def srgb_decode(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    return np.where(values <= 0.04045, values / 12.92, ((values + 0.055) / 1.055) ** 2.4)
 
 
 def extract_contrast(tests: dict[str, RawTest]) -> ContrastCurve | None:
@@ -1595,16 +1611,20 @@ def render_gamma(
 
     ref_x = np.linspace(0, 1, 256)
     ax.plot(ref_x, ref_x**2.2, "--", color="#999999", linewidth=1.0, label="ref 2.2")
-    ax.plot(ref_x, ref_x**2.4, ":", color="#666666", linewidth=1.0, label="ref 2.4")
+    ax.plot(ref_x, srgb_decode(ref_x), ":", color="#666666", linewidth=1.0, label="sRGB")
     if base_gamma is not None:
         if base_gamma.gamma is not None:
             ax.plot(ref_x, ref_x**base_gamma.gamma, "--", color=BASELINE_COLOR, linewidth=0.95, label=f"{labels.base} fit {base_gamma.gamma:.3f}")
-        ax.plot(
+        ax.errorbar(
             base_gamma.normalized_input,
             base_gamma.normalized_luminance,
-            "o",
+            yerr=base_gamma.normalized_y_std,
+            fmt="o",
             markerfacecolor="white",
             markeredgecolor=BASELINE_COLOR,
+            ecolor=BASELINE_COLOR,
+            elinewidth=0.55,
+            capsize=1.0,
             markersize=2.2,
             label=labels.base,
             zorder=4,
@@ -1613,11 +1633,15 @@ def render_gamma(
         run_fit_label = f"{labels.run} fit {gamma.gamma:.3f}" if base_gamma is not None else f"fit {gamma.gamma:.3f}"
         ax.plot(ref_x, ref_x**gamma.gamma, "-", color="#E69F00", linewidth=1.0, label=run_fit_label)
     if gamma is not None:
-        ax.plot(
+        ax.errorbar(
             gamma.normalized_input,
             gamma.normalized_luminance,
-            "o",
+            yerr=gamma.normalized_y_std,
+            fmt="o",
             color="#0072B2",
+            ecolor="#0072B2",
+            elinewidth=0.55,
+            capsize=1.0,
             markersize=2.4,
             label=labels.run,
             zorder=5,
@@ -1625,20 +1649,40 @@ def render_gamma(
     ax.set_xlabel("Gray code / 255", fontsize=7)
     ax.set_ylabel("Normalized luminance", fontsize=7)
     ax.set_xlim(-0.02, 1.02)
-    ax.set_ylim(-0.03, 1.05)
+    y_min, y_max = gamma_plot_limits(gamma, base_gamma)
+    ax.set_ylim(y_min, y_max)
     ax.legend(loc="upper left", fontsize=5.8, frameon=False)
 
-    details = []
+    details: list[str] = []
+    norm_details: list[str] = []
     if gamma and gamma.rms_gamma is not None:
         details.append(f"RMS {gamma.rms_gamma:.3f}")
+    if gamma and gamma.rms_srgb is not None:
+        details.append(f"sRGB {gamma.rms_srgb:.3f}")
     if gamma:
         details.append(f"Ymax {gamma.y_max:.1f}")
+        norm_details.append(gamma.normalization_label)
     if gamma and base_gamma and gamma.gamma is not None and base_gamma.gamma is not None:
         details.append(f"dG {gamma.gamma - base_gamma.gamma:+.3f}")
     if gamma and gamma.endpoint_drift_percent is not None:
         details.append(f"end {gamma.endpoint_drift_percent:+.1f}%")
-    if details:
-        ax.text(0.98, 0.05, " | ".join(details), ha="right", transform=ax.transAxes, fontsize=6.1, color="#4F5965")
+    annotation = "\n".join(line for line in (" | ".join(details), " | ".join(norm_details)) if line)
+    if annotation:
+        ax.text(0.98, 0.05, annotation, ha="right", transform=ax.transAxes, fontsize=5.7, color="#4F5965", linespacing=1.1)
+
+
+def gamma_plot_limits(gamma: GammaCurve | None, base_gamma: GammaCurve | None = None) -> tuple[float, float]:
+    values: list[float] = [0.0, 1.0]
+    for curve in (gamma, base_gamma):
+        if curve is None:
+            continue
+        y_low = curve.normalized_luminance - curve.normalized_y_std
+        y_high = curve.normalized_luminance + curve.normalized_y_std
+        values.extend(float(value) for value in y_low if np.isfinite(value))
+        values.extend(float(value) for value in y_high if np.isfinite(value))
+    y_min = min(values)
+    y_max = max(values)
+    return min(-0.03, y_min - 0.03), max(1.05, y_max + 0.04)
 
 
 def render_contrast(
