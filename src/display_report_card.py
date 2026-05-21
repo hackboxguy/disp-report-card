@@ -1699,7 +1699,7 @@ def render_local_dimming_apl(
     labels: SeriesLabels | None = None,
     compact: bool = False,
 ) -> None:
-    style_chart(ax, "Peak luminance vs window size" if compact else "Peak luminance vs window size (backlight 100%)")
+    style_chart(ax, "Peak luminance vs window size(OPR)")
     labels = labels or SeriesLabels(run="measured", base="base")
     if apl is None and base_apl is None:
         placeholder(ax, "No APL data in this run")
