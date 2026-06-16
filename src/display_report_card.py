@@ -1454,6 +1454,7 @@ def render_report_card(
     fig.patch.set_alpha(1.0)
     for ax in fig.axes:
         ax.patch.set_alpha(1.0)
+    add_render_timestamp(fig)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
@@ -1490,6 +1491,7 @@ def render_report_panels(
     for ax in fig.axes:
         ax.patch.set_alpha(1.0)
     fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2)
+    add_render_timestamp(fig)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
@@ -1502,6 +1504,23 @@ def panel_grid_shape(panel_count: int) -> tuple[int, int]:
     if panel_count <= 4:
         return (math.ceil(panel_count / 2), 2)
     return (math.ceil(panel_count / 3), 3)
+
+
+def render_timestamp_text(now: datetime | None = None) -> str:
+    timestamp = (now or datetime.now().astimezone()).strftime("%Y-%m-%d %H:%M:%S %Z").strip()
+    return f"Generated: {timestamp}"
+
+
+def add_render_timestamp(fig: plt.Figure) -> None:
+    fig.text(
+        0.992,
+        0.006,
+        render_timestamp_text(),
+        ha="right",
+        va="bottom",
+        fontsize=6,
+        color="#5B6472",
+    )
 
 
 def panel_grid_figsize(rows: int, cols: int, panel_count: int) -> tuple[float, float]:

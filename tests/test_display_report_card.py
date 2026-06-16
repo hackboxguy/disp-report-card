@@ -2,6 +2,7 @@ import argparse
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.display_report_card import (
@@ -16,6 +17,7 @@ from src.display_report_card import (
     parse_resolution,
     render_report_card,
     render_report_panels,
+    render_timestamp_text,
     series_labels,
     thermal_duration_minutes,
     thermal_final_d65_tolerance_multiple,
@@ -200,6 +202,11 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
             parse_resolution("1920")
         with self.assertRaises(argparse.ArgumentTypeError):
             parse_resolution("0x1080")
+
+    def test_render_timestamp_text_formats_generated_label(self) -> None:
+        value = datetime(2026, 6, 16, 18, 4, 39, tzinfo=timezone.utc)
+
+        self.assertEqual(render_timestamp_text(value), "Generated: 2026-06-16 18:04:39 UTC")
 
     def test_missing_summary_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
