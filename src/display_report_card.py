@@ -35,6 +35,20 @@ A4_LANDSCAPE_INCHES = (11.69, 8.27)
 DEFAULT_DPI = 200
 DEFAULT_WHITE_TOLERANCE = 0.010
 BASELINE_COLOR = "#6E7781"
+PANEL_CHOICES = (
+    "brightness",
+    "gamma",
+    "contrast",
+    "gamut",
+    "zoom_gamut",
+    "thermal_drift",
+    "local_dimming_apl",
+)
+PANEL_ALIASES = {
+    "zoom-gamut": "zoom_gamut",
+    "thermal-drift": "thermal_drift",
+    "local-dimming-apl": "local_dimming_apl",
+}
 
 STATUS_COLORS = {
     "PASS": "#1B8A5A",
@@ -1380,8 +1394,9 @@ def render_report_card(
     base_run: RunData | None = None,
     run_label: str | None = None,
     base_label: str | None = None,
+    resolution: tuple[int, int] | None = None,
 ) -> None:
-    fig = plt.figure(figsize=A4_LANDSCAPE_INCHES, dpi=dpi, facecolor="white")
+    fig = plt.figure(figsize=figsize_for_resolution(A4_LANDSCAPE_INCHES, dpi, resolution), dpi=dpi, facecolor="white")
     grid = fig.add_gridspec(
         4,
         2,
@@ -1443,6 +1458,107 @@ def render_report_card(
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
     plt.close(fig)
+
+
+def render_report_panels(
+    run: RunData,
+    output: Path,
+    panels: list[str],
+    dpi: int,
+    reference_gamut: str,
+    render_mode: str,
+    base_run: RunData | None = None,
+    run_label: str | None = None,
+    base_label: str | None = None,
+    resolution: tuple[int, int] | None = None,
+) -> None:
+    if not panels:
+        raise ValueError("at least one panel is required")
+
+    rows, cols = panel_grid_shape(len(panels))
+    figsize = figsize_for_resolution(panel_grid_figsize(rows, cols, len(panels)), dpi, resolution)
+    fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi, facecolor="white", squeeze=False)
+    labels = series_labels(run, base_run, run_label, base_label)
+
+    for ax, panel in zip(axes.flat, panels):
+        render_report_panel(ax, panel, run, base_run, labels, reference_gamut, render_mode)
+    for ax in list(axes.flat)[len(panels) :]:
+        ax.axis("off")
+
+    fig.patch.set_facecolor("white")
+    fig.patch.set_alpha(1.0)
+    for ax in fig.axes:
+        ax.patch.set_alpha(1.0)
+    fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
+    plt.close(fig)
+
+
+def panel_grid_shape(panel_count: int) -> tuple[int, int]:
+    if panel_count <= 1:
+        return (1, 1)
+    if panel_count <= 4:
+        return (math.ceil(panel_count / 2), 2)
+    return (math.ceil(panel_count / 3), 3)
+
+
+def panel_grid_figsize(rows: int, cols: int, panel_count: int) -> tuple[float, float]:
+    if panel_count == 1:
+        return (6.1, 4.35)
+    return (cols * 5.15, rows * 3.85)
+
+
+def figsize_for_resolution(
+    default_figsize: tuple[float, float],
+    dpi: int,
+    resolution: tuple[int, int] | None,
+) -> tuple[float, float]:
+    if resolution is None:
+        return default_figsize
+    width_px, height_px = resolution
+    return (width_px / dpi, height_px / dpi)
+
+
+def render_report_panel(
+    ax: plt.Axes,
+    panel: str,
+    run: RunData,
+    base_run: RunData | None,
+    labels: SeriesLabels,
+    reference_gamut: str,
+    render_mode: str,
+) -> None:
+    if panel == "brightness":
+        render_brightness(ax, run.brightness, base_run.brightness if base_run else None, labels)
+    elif panel == "gamma":
+        render_gamma(ax, run.gamma, base_run.gamma if base_run else None, labels)
+    elif panel == "contrast":
+        render_contrast(ax, run.contrast, base_run.contrast if base_run else None, labels)
+    elif panel == "gamut":
+        render_gamut(ax, run.gamut, reference_gamut, render_mode, run.warnings, base_run.gamut if base_run else None, labels)
+    elif panel == "zoom_gamut":
+        render_white_point_zoom(ax, run.gamut, base_run.gamut if base_run else None, labels)
+    elif panel == "thermal_drift":
+        render_thermal_white_point_drift(
+            ax,
+            run.thermal_profile,
+            base_run.thermal_profile if base_run else None,
+            labels,
+            run.gamut,
+            base_run.gamut if base_run else None,
+        )
+    elif panel == "local_dimming_apl":
+        render_local_dimming_apl(
+            ax,
+            run.local_dimming_apl,
+            base_run.local_dimming_apl if base_run else None,
+            labels,
+            compact=False,
+        )
+    else:
+        raise ValueError(f"unknown panel: {panel}")
 
 
 def render_header(ax: plt.Axes, run: RunData, title: str, base_run: RunData | None = None) -> None:
@@ -2751,6 +2867,37 @@ def default_output_path(run: RunData, base_run: RunData | None = None) -> Path:
     return Path(filename)
 
 
+def parse_panels(value: str) -> list[str]:
+    panels: list[str] = []
+    raw_panels = [part.strip() for part in value.split(",")]
+    if not raw_panels or any(not part for part in raw_panels):
+        raise argparse.ArgumentTypeError("panels must be a comma-separated list")
+
+    for raw_panel in raw_panels:
+        panel = raw_panel.lower()
+        panel = PANEL_ALIASES.get(panel, panel)
+        if panel == "all":
+            if len(raw_panels) > 1:
+                raise argparse.ArgumentTypeError("'all' cannot be combined with other panels")
+            return ["all"]
+        if panel not in PANEL_CHOICES:
+            choices = ", ".join(("all",) + PANEL_CHOICES)
+            raise argparse.ArgumentTypeError(f"unknown panel '{raw_panel}' (choose from: {choices})")
+        if panel not in panels:
+            panels.append(panel)
+    return panels
+
+
+def parse_resolution(value: str) -> tuple[int, int]:
+    match = re.fullmatch(r"\s*(\d+)\s*[xX]\s*(\d+)\s*", value)
+    if match is None:
+        raise argparse.ArgumentTypeError("resolution must use WIDTHxHEIGHT, e.g. 1920x1080")
+    width, height = (int(match.group(1)), int(match.group(2)))
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError("resolution dimensions must be positive")
+    return (width, height)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a display test report card PNG.")
     parser.add_argument("--input", required=True, type=Path, help="Input display test result folder.")
@@ -2760,7 +2907,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
     parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="ntsc")
     parser.add_argument("--render", choices=["basic", "advanced"], default="basic", help="Gamut rendering mode.")
+    parser.add_argument(
+        "--panels",
+        type=parse_panels,
+        default=None,
+        help="Comma-separated chart panels: all, brightness, gamma, contrast, gamut, zoom_gamut, thermal_drift, local_dimming_apl.",
+    )
     parser.add_argument("--dpi", type=int, default=DEFAULT_DPI)
+    parser.add_argument("--resolution", type=parse_resolution, default=None, help="Output PNG size in pixels, e.g. 1920x1080.")
     parser.add_argument("--title", default="Display Test Report Card")
     parser.add_argument("--serial-number", default=None, help="Override display serial number.")
     parser.add_argument("--tester-version", default=None, help="Override tester version.")
@@ -2777,17 +2931,32 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output = args.output or default_output_path(run, base_run)
-    render_report_card(
-        run,
-        output,
-        args.title,
-        args.dpi,
-        args.reference_gamut,
-        args.render,
-        base_run,
-        args.run_label,
-        args.base_label,
-    )
+    if args.panels is not None and args.panels != ["all"]:
+        render_report_panels(
+            run,
+            output,
+            args.panels,
+            args.dpi,
+            args.reference_gamut,
+            args.render,
+            base_run,
+            args.run_label,
+            args.base_label,
+            args.resolution,
+        )
+    else:
+        render_report_card(
+            run,
+            output,
+            args.title,
+            args.dpi,
+            args.reference_gamut,
+            args.render,
+            base_run,
+            args.run_label,
+            args.base_label,
+            args.resolution,
+        )
     if base_run:
         for warning in base_run.warnings:
             print(f"warning(base): {warning}", file=sys.stderr)

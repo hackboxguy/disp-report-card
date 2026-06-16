@@ -79,9 +79,28 @@ Options:
 - `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
 - `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`; default is `ntsc`.
 - `--render` - `basic` by default, or `advanced` for an optional CIE chromaticity background when `colour-science` is installed.
+- `--panels` - optional comma-separated chart-only output. Use `gamut,zoom_gamut` for gamut plus zoomed D65/white-point, or choose from `brightness`, `gamma`, `contrast`, `gamut`, `zoom_gamut`, `thermal_drift`, `local_dimming_apl`; `all` keeps the full report-card layout.
 - `--dpi` - output DPI, default `200`.
+- `--resolution` - optional output PNG size in pixels, for example `1920x720` or `1920x1080`.
 - `--serial-number` - temporary header override.
 - `--tester-version` - temporary header override.
+
+Chart-only examples:
+
+```bash
+./src/display_report_card.py \
+  --input test-data/15-6-0od \
+  --output out/15-6-gamut-panels.png \
+  --panels gamut,zoom_gamut \
+  --resolution 1920x720
+```
+
+```bash
+./src/display_report_card.py \
+  --input test-data/15-6-0od \
+  --output out/15-6-optical-response.png \
+  --panels brightness,gamma,contrast
+```
 
 The default gamut panel uses NTSC 1953 primaries with D65 white. It reports reference coverage,
 relative measured area, measured white-point offset, and distance against the default D65 tolerance

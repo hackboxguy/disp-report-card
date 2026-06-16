@@ -12,7 +12,10 @@ from src.display_report_card import (
     format_fpga_label,
     gamut_temperature_annotation_parts,
     load_run_folder,
+    parse_panels,
+    parse_resolution,
     render_report_card,
+    render_report_panels,
     series_labels,
     thermal_duration_minutes,
     thermal_final_d65_tolerance_multiple,
@@ -162,6 +165,41 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
             self.assertIsNone(run.thermal_profile)
             self.assertTrue(output.exists())
+
+    def test_partial_gamut_panels_render(self) -> None:
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "gamut-panels.png"
+
+            render_report_panels(run, output, ["gamut", "zoom_gamut"], 72, "ntsc", "basic")
+
+            self.assertTrue(output.exists())
+            self.assertGreater(output.stat().st_size, 0)
+
+    def test_parse_panels_normalizes_aliases_and_rejects_invalid_values(self) -> None:
+        self.assertEqual(parse_panels("gamut,zoom-gamut,zoom_gamut"), ["gamut", "zoom_gamut"])
+        self.assertEqual(parse_panels("all"), ["all"])
+        with self.assertRaises(argparse.ArgumentTypeError):
+            parse_panels("gamut,all")
+        with self.assertRaises(argparse.ArgumentTypeError):
+            parse_panels("gamut,missing")
+
+    def test_partial_panels_can_target_png_resolution(self) -> None:
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "gamut-panels-720p.png"
+
+            render_report_panels(run, output, ["gamut", "zoom_gamut"], 100, "ntsc", "basic", resolution=(1280, 720))
+
+            self.assertEqual(png_size(output), (1280, 720))
+
+    def test_parse_resolution_accepts_width_by_height_and_rejects_invalid_values(self) -> None:
+        self.assertEqual(parse_resolution("1920x720"), (1920, 720))
+        self.assertEqual(parse_resolution("1920X1080"), (1920, 1080))
+        with self.assertRaises(argparse.ArgumentTypeError):
+            parse_resolution("1920")
+        with self.assertRaises(argparse.ArgumentTypeError):
+            parse_resolution("0x1080")
 
     def test_missing_summary_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -578,6 +616,13 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise AssertionError(f"{path} is not a PNG")
+    return (int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big"))
 
 
 def write_minimal_run(path: Path, run_id: str, fpga_version: str, fpga_date: str, ioc_flood_result: str) -> None:
