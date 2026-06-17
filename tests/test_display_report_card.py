@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.display_report_card import (
+    GamutMetrics,
     REFERENCE_GAMUTS,
     ThermalLuminanceProfile,
     ThermalLuminanceSample,
@@ -15,6 +16,7 @@ from src.display_report_card import (
     load_run_folder,
     parse_panels,
     parse_resolution,
+    render_gamut,
     render_report_card,
     render_report_panels,
     render_timestamp_text,
@@ -23,6 +25,8 @@ from src.display_report_card import (
     thermal_final_d65_tolerance_multiple,
     thermal_tolerance_exit,
 )
+
+import matplotlib.pyplot as plt
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -177,6 +181,41 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
             self.assertTrue(output.exists())
             self.assertGreater(output.stat().st_size, 0)
+
+    def test_gamut_annotation_includes_full_white_peak_above_coverage(self) -> None:
+        reference = REFERENCE_GAMUTS["ntsc"]
+        gamut = GamutMetrics(
+            source="unit-test",
+            points={"R": reference["r"], "G": reference["g"], "B": reference["b"]},
+            white_luminance=932.42,
+            white_point=reference["w"],
+            reference_name=reference["name"],
+            reference_white=reference["w"],
+            reference_white_name=reference["white_name"],
+            reference_points={"R": reference["r"], "G": reference["g"], "B": reference["b"]},
+            measured_area=0.1,
+            reference_area=0.1,
+            overlap_area=0.09,
+            coverage_percent=86.5,
+            relative_area_percent=91.2,
+            white_delta=(0.0, 0.0),
+            white_tolerance=0.010,
+            white_tolerance_distance=0.0,
+            white_within_tolerance=True,
+        )
+        fig, ax = plt.subplots()
+        try:
+            render_gamut(ax, gamut, "ntsc", "basic", [])
+            annotation = next(
+                text.get_text()
+                for text in ax.texts
+                if "full white peak" in text.get_text()
+            )
+        finally:
+            plt.close(fig)
+
+        self.assertEqual(annotation.splitlines()[0], "full white peak 932.4 nits")
+        self.assertIn("cov 86.5% | area 91.2%", annotation.splitlines()[1])
 
     def test_parse_panels_normalizes_aliases_and_rejects_invalid_values(self) -> None:
         self.assertEqual(parse_panels("gamut,zoom-gamut,zoom_gamut"), ["gamut", "zoom_gamut"])

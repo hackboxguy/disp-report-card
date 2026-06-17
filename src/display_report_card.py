@@ -2695,8 +2695,11 @@ def render_gamut(
     if gamut.white_point:
         white_label = f"{labels.run} white" if base_gamut is not None else "white"
         ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=3.0, label=white_label)
+        luminance_parts = []
         coverage_parts = []
         white_parts = []
+        if gamut.white_luminance is not None:
+            luminance_parts.append(f"full white peak {gamut.white_luminance:.1f} nits")
         if gamut.coverage_percent is not None:
             coverage_parts.append(f"cov {gamut.coverage_percent:.1f}%")
         if gamut.relative_area_percent is not None:
@@ -2707,7 +2710,11 @@ def render_gamut(
         if gamut.white_tolerance_distance is not None:
             white_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
         temp_parts = gamut_temperature_annotation_parts(gamut)
-        annotation = "\n".join(" | ".join(parts) for parts in (coverage_parts, white_parts, temp_parts) if parts)
+        annotation = "\n".join(
+            " | ".join(parts)
+            for parts in (luminance_parts, coverage_parts, white_parts, temp_parts)
+            if parts
+        )
         if annotation:
             ax.text(
                 0.98,
