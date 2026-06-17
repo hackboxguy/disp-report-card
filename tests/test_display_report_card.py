@@ -499,6 +499,89 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         apl_row = next(row for row in run.status_rows if row.name == "test-local-dimming-apl")
         self.assertEqual(apl_row.note, "2/3 APL, 1 skip")
 
+    def test_local_dimming_apl_absolute_mode_uses_box_side_mm(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            artifact_dir = run_dir / "artifacts"
+            raw_dir.mkdir()
+            artifact_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "local-dimming-apl-absolute"})
+            write_json(
+                raw_dir / "test-local-dimming-apl.json",
+                {
+                    "test_info": {"name": "test-local-dimming-apl", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {
+                        "apl_json": "artifacts/local-dimming-apl-sweep.json",
+                        "sweep_mode": "absolute_apl",
+                        "samples_attempted": 3,
+                        "samples_collected": 2,
+                        "samples_skipped": 1,
+                    },
+                },
+            )
+            write_json(
+                artifact_dir / "local-dimming-apl-sweep.json",
+                {
+                    "schema_version": "1.0",
+                    "display_model": "fixture-display",
+                    "sweep_mode": "absolute_apl",
+                    "display_active_width_mm": 323,
+                    "display_active_height_mm": 186,
+                    "samples_attempted": 3,
+                    "samples_collected": 2,
+                    "samples_skipped": 1,
+                    "samples": [
+                        {
+                            "index": 1,
+                            "sweep_mode": "absolute_apl",
+                            "apl_percent": 0.0067,
+                            "equivalent_apl_percent": 0.0067,
+                            "box_side_mm": 2.0,
+                            "fits_screen": True,
+                            "below_sensor_aperture": True,
+                            "Y_luminance": 0.5,
+                            "x_chromaticity": 0.3127,
+                            "y_chromaticity": 0.3290,
+                        },
+                        {
+                            "index": 2,
+                            "sweep_mode": "absolute_apl",
+                            "apl_percent": 0.1664,
+                            "equivalent_apl_percent": 0.1664,
+                            "box_side_mm": 10.0,
+                            "fits_screen": True,
+                            "below_sensor_aperture": True,
+                            "Y_luminance": 66.0,
+                            "x_chromaticity": 0.3127,
+                            "y_chromaticity": 0.3290,
+                        },
+                        {
+                            "index": 3,
+                            "sweep_mode": "absolute_apl",
+                            "apl_percent": 150.0,
+                            "equivalent_apl_percent": 150.0,
+                            "box_side_mm": 400.0,
+                            "fits_screen": False,
+                            "below_sensor_aperture": False,
+                            "Y_luminance": None,
+                            "skip_reason": "box side 400mm exceeds active area 323x186mm",
+                        },
+                    ],
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        self.assertEqual(run.local_dimming_apl.sweep_mode, "absolute_apl")
+        self.assertEqual(run.local_dimming_apl.display_active_width_mm, 323)
+        measured = [sample for sample in run.local_dimming_apl.samples if sample.fits_screen]
+        self.assertEqual([sample.box_side_mm for sample in measured], [2.0, 10.0])
+        self.assertTrue(measured[0].below_sensor_aperture)
+        apl_row = next(row for row in run.status_rows if row.name == "test-local-dimming-apl")
+        self.assertEqual(apl_row.note, "2/3 windows, 1 skip")
+
     def test_thermal_profile_csv_is_loaded_and_rendered(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             run_dir = Path(temp_dir)
