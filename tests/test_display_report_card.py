@@ -24,6 +24,7 @@ from src.display_report_card import (
     thermal_duration_minutes,
     thermal_final_d65_tolerance_multiple,
     thermal_tolerance_exit,
+    white_point_zoom_limits,
 )
 
 import matplotlib.pyplot as plt
@@ -216,6 +217,31 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
         self.assertEqual(annotation.splitlines()[0], "full white peak 932.4 nits")
         self.assertIn("cov 86.5% | area 91.2%", annotation.splitlines()[1])
+
+    def test_white_point_zoom_uses_common_default_limits_for_near_d65_points(self) -> None:
+        reference_white = REFERENCE_GAMUTS["ntsc"]["w"]
+
+        before_matching = white_point_zoom_limits([(0.3085, 0.3095)], reference_white)
+        after_matching = white_point_zoom_limits([(0.3071, 0.3194)], reference_white)
+        edge_lit = white_point_zoom_limits([(0.3049, 0.3225)], reference_white)
+
+        self.assertEqual(before_matching, after_matching)
+        self.assertEqual(after_matching, edge_lit)
+        self.assertAlmostEqual(before_matching[0], 0.2925)
+        self.assertAlmostEqual(before_matching[1], 0.3255)
+        self.assertAlmostEqual(before_matching[2], 0.3038)
+        self.assertAlmostEqual(before_matching[3], 0.3467)
+
+    def test_white_point_zoom_expands_when_white_point_is_outside_default_limits(self) -> None:
+        reference_white = REFERENCE_GAMUTS["ntsc"]["w"]
+        far_white = (0.285, 0.355)
+
+        x_min, x_max, y_min, y_max = white_point_zoom_limits([far_white], reference_white)
+
+        self.assertLess(x_min, far_white[0])
+        self.assertGreater(x_max, reference_white[0] + 0.010)
+        self.assertLess(y_min, reference_white[1] - 0.012)
+        self.assertGreater(y_max, far_white[1])
 
     def test_parse_panels_normalizes_aliases_and_rejects_invalid_values(self) -> None:
         self.assertEqual(parse_panels("gamut,zoom-gamut,zoom_gamut"), ["gamut", "zoom_gamut"])

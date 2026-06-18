@@ -27,13 +27,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnnotationBbox, HPacker, TextArea
 from matplotlib.patches import Ellipse, Rectangle
-from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
+from matplotlib.ticker import FuncFormatter, LogLocator, MultipleLocator, NullFormatter
 import numpy as np
 
 
 A4_LANDSCAPE_INCHES = (11.69, 8.27)
 DEFAULT_DPI = 200
 DEFAULT_WHITE_TOLERANCE = 0.010
+WHITE_POINT_ZOOM_X_OFFSET = (-0.0202, 0.0128)
+WHITE_POINT_ZOOM_Y_OFFSET = (-0.0252, 0.0177)
+WHITE_POINT_ZOOM_EDGE_PAD = 0.004
 BASELINE_COLOR = "#6E7781"
 PANEL_CHOICES = (
     "brightness",
@@ -2230,11 +2233,7 @@ def render_white_point_zoom(
         white_points.append(base_gamut.white_point)
     if gamut is not None and gamut.white_point is not None:
         white_points.append(gamut.white_point)
-    x_min, x_max, y_min, y_max = thermal_zoom_limits(
-        [point[0] for point in white_points],
-        [point[1] for point in white_points],
-        reference_white,
-    )
+    x_min, x_max, y_min, y_max = white_point_zoom_limits(white_points, reference_white)
 
     draw_white_reference(ax, reference_white, "D65", DEFAULT_WHITE_TOLERANCE)
     if base_gamut is not None and base_gamut.white_point is not None:
@@ -2262,6 +2261,8 @@ def render_white_point_zoom(
 
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
+    ax.xaxis.set_major_locator(MultipleLocator(0.005))
+    ax.yaxis.set_major_locator(MultipleLocator(0.005))
     ax.set_aspect("auto", adjustable="box")
     ax.set_xlabel("CIE x", fontsize=6.4)
     ax.set_ylabel("CIE y", fontsize=6.4)
@@ -2329,6 +2330,43 @@ def thermal_zoom_limits(
     span = max(x_max - x_min, y_max - y_min, 0.020)
     pad = max(span * 0.18, 0.004)
     return x_min - pad * 1.8, x_max + pad * 0.5, y_min - pad, y_max + pad
+
+
+def white_point_zoom_limits(
+    white_points: list[tuple[float, float]],
+    reference_white: tuple[float, float],
+) -> tuple[float, float, float, float]:
+    x_min = reference_white[0] + WHITE_POINT_ZOOM_X_OFFSET[0]
+    x_max = reference_white[0] + WHITE_POINT_ZOOM_X_OFFSET[1]
+    y_min = reference_white[1] + WHITE_POINT_ZOOM_Y_OFFSET[0]
+    y_max = reference_white[1] + WHITE_POINT_ZOOM_Y_OFFSET[1]
+
+    x_required = [
+        reference_white[0] - DEFAULT_WHITE_TOLERANCE,
+        reference_white[0] + DEFAULT_WHITE_TOLERANCE,
+        *(point[0] for point in white_points),
+    ]
+    y_required = [
+        reference_white[1] - DEFAULT_WHITE_TOLERANCE * 1.2,
+        reference_white[1] + DEFAULT_WHITE_TOLERANCE * 1.2,
+        *(point[1] for point in white_points),
+    ]
+
+    required_x_min = min(x_required)
+    required_x_max = max(x_required)
+    required_y_min = min(y_required)
+    required_y_max = max(y_required)
+
+    if required_x_min < x_min:
+        x_min = required_x_min - WHITE_POINT_ZOOM_EDGE_PAD
+    if required_x_max > x_max:
+        x_max = required_x_max + WHITE_POINT_ZOOM_EDGE_PAD
+    if required_y_min < y_min:
+        y_min = required_y_min - WHITE_POINT_ZOOM_EDGE_PAD
+    if required_y_max > y_max:
+        y_max = required_y_max + WHITE_POINT_ZOOM_EDGE_PAD
+
+    return x_min, x_max, y_min, y_max
 
 
 def plot_thermal_profile(
