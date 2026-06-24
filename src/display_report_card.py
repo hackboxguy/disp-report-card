@@ -48,6 +48,7 @@ PANEL_CHOICES = (
     "local_dimming_apl",
 )
 PANEL_ALIASES = {
+    "apl": "local_dimming_apl",
     "zoom-gamut": "zoom_gamut",
     "thermal-drift": "thermal_drift",
     "local-dimming-apl": "local_dimming_apl",

@@ -3,6 +3,8 @@ REPORT := src/display_report_card.py
 PYTHON_CACHE_DIRS := src/__pycache__ tests/__pycache__
 OUT ?= out/compare-report-card.png
 LABEL_ARGS := $(if $(BASE_LABEL),--base-label "$(BASE_LABEL)") $(if $(RUN_LABEL),--run-label "$(RUN_LABEL)")
+COMPARE_PANELS := $(strip $(or $(PANELS),$(PANEL)))
+PANEL_ARGS := $(if $(COMPARE_PANELS),--panels "$(COMPARE_PANELS)")
 
 # Install layout (override PREFIX/DESTDIR for staged or relocated installs)
 PREFIX ?= /usr/local
@@ -31,7 +33,7 @@ report-samples-advanced:
 
 compare:
 	mkdir -p out
-	$(PYTHON) $(REPORT) --base-input $(BASE) --input $(RUN) --output $(OUT) $(LABEL_ARGS)
+	$(PYTHON) $(REPORT) --base-input $(BASE) --input $(RUN) --output $(OUT) $(LABEL_ARGS) $(PANEL_ARGS)
 
 install:
 	install -d "$(DESTDIR)$(LIBDIR)"

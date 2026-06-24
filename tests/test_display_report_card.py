@@ -245,6 +245,7 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
     def test_parse_panels_normalizes_aliases_and_rejects_invalid_values(self) -> None:
         self.assertEqual(parse_panels("gamut,zoom-gamut,zoom_gamut"), ["gamut", "zoom_gamut"])
+        self.assertEqual(parse_panels("apl"), ["local_dimming_apl"])
         self.assertEqual(parse_panels("all"), ["all"])
         with self.assertRaises(argparse.ArgumentTypeError):
             parse_panels("gamut,all")

@@ -136,10 +136,21 @@ make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
 
 make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
   BASE_LABEL=baseline RUN_LABEL=current OUT=out/15-6-self-compare.png
+
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
+  OUT=out/15-6-apl-compare.png PANEL=apl
+
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
+  OUT=out/15-6-gamut-compare.png PANEL=gamut
+
+make compare BASE=test-data/15-6-0od RUN=test-data/15-6-0od \
+  OUT=out/15-6-gamut-analysis-compare.png PANELS=gamut,zoom_gamut
 ```
 
 The test matrix remains run-focused and highlights result changes from the baseline. If labels are
-not supplied, comparison charts use FPGA labels derived from `test-version-read`.
+not supplied, comparison charts use FPGA labels derived from `test-version-read`. `PANEL` and
+`PANELS` keep comparison mode focused on partial analysis outputs such as APL or gamut data while
+leaving the default full comparison unchanged.
 
 ## Verification
 
