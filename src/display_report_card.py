@@ -2536,7 +2536,7 @@ def render_local_dimming_apl(
             va="top",
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.0},
         )
-    ax.set_xlabel("Box side (mm)" if absolute_mode else "APL (%)", fontsize=6.4)
+    ax.set_xlabel("Square Box Size(mm)" if absolute_mode else "APL (%)", fontsize=6.4)
     ax.set_ylabel("Peak Y (cd/m^2)", fontsize=6.4)
     ax.legend(loc="upper left", bbox_to_anchor=(0.0, 0.56 if compact else 0.56), fontsize=5.4 if compact else 5.6, frameon=False)
 
