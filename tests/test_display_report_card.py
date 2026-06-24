@@ -1,4 +1,5 @@
 import argparse
+import csv
 import json
 import tempfile
 import unittest
@@ -12,8 +13,10 @@ from src.display_report_card import (
     ThermalLuminanceSample,
     comparison_status_rows,
     format_fpga_label,
+    gamut_comparison_annotation_lines,
     gamut_temperature_annotation_parts,
     load_run_folder,
+    parse_args,
     parse_panels,
     parse_resolution,
     render_gamut,
@@ -25,6 +28,8 @@ from src.display_report_card import (
     thermal_final_d65_tolerance_multiple,
     thermal_tolerance_exit,
     white_point_zoom_limits,
+    white_point_zoom_comparison_lines,
+    write_csv_output,
 )
 
 import matplotlib.pyplot as plt
@@ -243,6 +248,24 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertLess(y_min, reference_white[1] - 0.012)
         self.assertGreater(y_max, far_white[1])
 
+    def test_partial_panels_render_with_custom_label(self) -> None:
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "gamut-panels-label.png"
+
+            render_report_panels(
+                run,
+                output,
+                ["gamut", "zoom_gamut"],
+                72,
+                "ntsc",
+                "basic",
+                custom_label="Gamut compared after white-point match",
+            )
+
+            self.assertTrue(output.exists())
+            self.assertGreater(output.stat().st_size, 0)
+
     def test_parse_panels_normalizes_aliases_and_rejects_invalid_values(self) -> None:
         self.assertEqual(parse_panels("gamut,zoom-gamut,zoom_gamut"), ["gamut", "zoom_gamut"])
         self.assertEqual(parse_panels("apl"), ["local_dimming_apl"])
@@ -273,6 +296,62 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         value = datetime(2026, 6, 16, 18, 4, 39, tzinfo=timezone.utc)
 
         self.assertEqual(render_timestamp_text(value), "Generated: 2026-06-16 18:04:39 UTC")
+
+    def test_parse_args_accepts_custom_label_aliases(self) -> None:
+        args = parse_args(["--input", "run", "--custom_label", "underscore label"])
+        self.assertEqual(args.custom_label, "underscore label")
+        args = parse_args(["--input", "run", "--custom-label", "hyphen label"])
+        self.assertEqual(args.custom_label, "hyphen label")
+
+    def test_parse_args_accepts_csv_output_aliases(self) -> None:
+        args = parse_args(["--input", "run", "--csvoutput", "out.csv"])
+        self.assertEqual(args.csv_output, Path("out.csv"))
+        args = parse_args(["--input", "run", "--csv-output", "out.csv"])
+        self.assertEqual(args.csv_output, Path("out.csv"))
+        args = parse_args(["--input", "run", "--csvdata", "out.csv"])
+        self.assertEqual(args.csv_output, Path("out.csv"))
+
+    def test_csv_output_includes_gamut_comparison_data(self) -> None:
+        base = load_run_folder(REPO_ROOT / "test-data" / "12-3-nq1v1", loader_args())
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "gamut.csv"
+
+            write_csv_output(output, run, base, ["gamut", "zoom_gamut"], "ntsc", "after", "edge")
+
+            with output.open(encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertEqual(rows[0]["panel"], "gamut")
+        coverage = next(row for row in rows if row["panel"] == "gamut" and row["series"] == "after" and row["metric"] == "coverage_percent")
+        self.assertAlmostEqual(float(coverage["value"]), run.gamut.coverage_percent)
+        coverage_delta = next(row for row in rows if row["panel"] == "gamut" and row["series"] == "delta" and row["metric"] == "coverage_delta_pp")
+        self.assertAlmostEqual(float(coverage_delta["value"]), run.gamut.coverage_percent - base.gamut.coverage_percent)
+        d65_delta = next(row for row in rows if row["panel"] == "zoom_gamut" and row["series"] == "delta" and row["metric"] == "d65_distance_delta")
+        self.assertLess(float(d65_delta["value"]), 0.0)
+
+    def test_gamut_comparison_annotation_includes_base_run_and_delta(self) -> None:
+        base = load_run_folder(REPO_ROOT / "test-data" / "12-3-nq1v1", loader_args())
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        labels = series_labels(run, base, "after", "edge")
+
+        lines = gamut_comparison_annotation_lines(run.gamut, base.gamut, labels)
+
+        self.assertEqual(lines[0], "edge peak 1045.9 nits | cov 78.9% | area 86.4%")
+        self.assertEqual(lines[1], "after peak 1103.6 nits | cov 96.8% | area 102.4%")
+        self.assertEqual(lines[2], "dCov +18.0pp")
+
+    def test_white_point_zoom_comparison_includes_base_run_and_delta(self) -> None:
+        base = load_run_folder(REPO_ROOT / "test-data" / "12-3-nq1v1", loader_args())
+        run = load_run_folder(REPO_ROOT / "test-data" / "15-6-0od", loader_args())
+        labels = series_labels(run, base, "after", "edge")
+
+        lines = white_point_zoom_comparison_lines(run.gamut, base.gamut, labels)
+
+        self.assertEqual(len(lines), 3)
+        self.assertRegex(lines[0], r"^edge dD65 0\.\d{4} \| \d+\.\d{2}x tol$")
+        self.assertRegex(lines[1], r"^after dD65 0\.\d{4} \| \d+\.\d{2}x tol$")
+        self.assertRegex(lines[2], r"^dD65 [-+]0\.\d{4}$")
 
     def test_missing_summary_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

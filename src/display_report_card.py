@@ -53,6 +53,20 @@ PANEL_ALIASES = {
     "thermal-drift": "thermal_drift",
     "local-dimming-apl": "local_dimming_apl",
 }
+CSV_COLUMNS = [
+    "panel",
+    "series",
+    "row_type",
+    "metric",
+    "index",
+    "label",
+    "x",
+    "y",
+    "value",
+    "unit",
+    "source",
+    "notes",
+]
 
 STATUS_COLORS = {
     "PASS": "#1B8A5A",
@@ -1422,6 +1436,7 @@ def render_report_card(
     run_label: str | None = None,
     base_label: str | None = None,
     resolution: tuple[int, int] | None = None,
+    custom_label: str | None = None,
 ) -> None:
     fig = plt.figure(figsize=figsize_for_resolution(A4_LANDSCAPE_INCHES, dpi, resolution), dpi=dpi, facecolor="white")
     grid = fig.add_gridspec(
@@ -1482,6 +1497,7 @@ def render_report_card(
     for ax in fig.axes:
         ax.patch.set_alpha(1.0)
     add_render_timestamp(fig)
+    add_custom_label(fig, custom_label)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
@@ -1499,6 +1515,7 @@ def render_report_panels(
     run_label: str | None = None,
     base_label: str | None = None,
     resolution: tuple[int, int] | None = None,
+    custom_label: str | None = None,
 ) -> None:
     if not panels:
         raise ValueError("at least one panel is required")
@@ -1517,8 +1534,12 @@ def render_report_panels(
     fig.patch.set_alpha(1.0)
     for ax in fig.axes:
         ax.patch.set_alpha(1.0)
-    fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2)
+    if normalized_custom_label(custom_label):
+        fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2, rect=(0.0, 0.045, 1.0, 1.0))
+    else:
+        fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2)
     add_render_timestamp(fig)
+    add_custom_label(fig, custom_label)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi, facecolor="white", edgecolor="white", transparent=False)
@@ -1567,6 +1588,30 @@ def figsize_for_resolution(
     return (width_px / dpi, height_px / dpi)
 
 
+def normalized_custom_label(custom_label: str | None) -> str:
+    if custom_label is None:
+        return ""
+    return " ".join(str(custom_label).split())
+
+
+def add_custom_label(fig: plt.Figure, custom_label: str | None) -> None:
+    label = normalized_custom_label(custom_label)
+    if not label:
+        return
+    fig.text(
+        0.012,
+        0.010,
+        shorten(label, 180),
+        fontsize=9.6,
+        color="#000000",
+        weight="bold",
+        ha="left",
+        va="bottom",
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.76, "pad": 1.2},
+        zorder=20,
+    )
+
+
 def render_report_panel(
     ax: plt.Axes,
     panel: str,
@@ -1605,6 +1650,362 @@ def render_report_panel(
         )
     else:
         raise ValueError(f"unknown panel: {panel}")
+
+
+def write_csv_output(
+    output: Path,
+    run: RunData,
+    base_run: RunData | None,
+    panels: list[str] | None,
+    reference_gamut: str,
+    run_label: str | None = None,
+    base_label: str | None = None,
+) -> None:
+    labels = series_labels(run, base_run, run_label, base_label)
+    rows: list[dict[str, Any]] = []
+    for panel in csv_panels_for_export(panels, run, base_run):
+        rows.extend(csv_rows_for_panel(panel, run, base_run, labels, reference_gamut))
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: csv_value(row.get(key)) for key in CSV_COLUMNS})
+
+
+def csv_panels_for_export(panels: list[str] | None, run: RunData, base_run: RunData | None) -> list[str]:
+    if panels is not None and panels != ["all"]:
+        return panels
+
+    resolved = ["brightness", "gamma", "contrast", "gamut", "local_dimming_apl"]
+    has_thermal_profile = run.thermal_profile is not None or (base_run is not None and base_run.thermal_profile is not None)
+    has_white_point_detail = gamut_has_white_point(run.gamut) or (base_run is not None and gamut_has_white_point(base_run.gamut))
+    if has_thermal_profile:
+        resolved.append("thermal_drift")
+    elif has_white_point_detail:
+        resolved.append("zoom_gamut")
+    return resolved
+
+
+def csv_rows_for_panel(
+    panel: str,
+    run: RunData,
+    base_run: RunData | None,
+    labels: SeriesLabels,
+    reference_gamut: str,
+) -> list[dict[str, Any]]:
+    if panel == "brightness":
+        return brightness_csv_rows(run.brightness, labels.run) + brightness_csv_rows(base_run.brightness if base_run else None, labels.base)
+    if panel == "gamma":
+        return gamma_csv_rows(run.gamma, labels.run) + gamma_csv_rows(base_run.gamma if base_run else None, labels.base)
+    if panel == "contrast":
+        return contrast_csv_rows(run.contrast, labels.run) + contrast_csv_rows(base_run.contrast if base_run else None, labels.base)
+    if panel == "gamut":
+        rows = gamut_reference_csv_rows(reference_gamut)
+        rows.extend(gamut_csv_rows(base_run.gamut if base_run else None, labels.base))
+        rows.extend(gamut_csv_rows(run.gamut, labels.run))
+        rows.extend(gamut_comparison_csv_rows(run.gamut, base_run.gamut if base_run else None))
+        return rows
+    if panel == "zoom_gamut":
+        rows = white_point_reference_csv_rows(run.gamut or (base_run.gamut if base_run else None))
+        rows.extend(white_point_zoom_csv_rows(base_run.gamut if base_run else None, labels.base))
+        rows.extend(white_point_zoom_csv_rows(run.gamut, labels.run))
+        rows.extend(white_point_zoom_comparison_csv_rows(run.gamut, base_run.gamut if base_run else None))
+        return rows
+    if panel == "thermal_drift":
+        return thermal_profile_csv_rows(run.thermal_profile, labels.run) + thermal_profile_csv_rows(base_run.thermal_profile if base_run else None, labels.base)
+    if panel == "local_dimming_apl":
+        return apl_csv_rows(run.local_dimming_apl, labels.run) + apl_csv_rows(base_run.local_dimming_apl if base_run else None, labels.base)
+    return []
+
+
+def csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return ""
+        return f"{value:.10g}"
+    return str(value)
+
+
+def csv_row(panel: str, series: str, row_type: str, metric: str, **kwargs: Any) -> dict[str, Any]:
+    row = {"panel": panel, "series": series, "row_type": row_type, "metric": metric}
+    row.update(kwargs)
+    return row
+
+
+def brightness_csv_rows(brightness: BrightnessCurve | None, series: str) -> list[dict[str, Any]]:
+    if brightness is None:
+        return []
+    rows = [
+        csv_row(
+            "brightness",
+            series,
+            "sample",
+            "luminance",
+            index=index,
+            x=level,
+            y=luminance,
+            value=luminance,
+            unit="cd/m2",
+            source=brightness.source,
+        )
+        for index, (level, luminance) in enumerate(zip(brightness.brightness_percent, brightness.luminance), start=1)
+    ]
+    for index, (level, expected) in enumerate(zip(brightness.brightness_percent, brightness.expected_luminance), start=1):
+        rows.append(
+            csv_row(
+                "brightness",
+                series,
+                "sample",
+                "expected_luminance",
+                index=index,
+                x=level,
+                y=expected,
+                value=expected,
+                unit="cd/m2",
+                source=brightness.source,
+            )
+        )
+    for metric, value in (
+        ("sample_count", brightness.sample_count),
+        ("complete", brightness.complete),
+        ("from_cache", brightness.from_cache),
+    ):
+        rows.append(csv_row("brightness", series, "metric", metric, value=value, source=brightness.source))
+    return rows
+
+
+def gamma_csv_rows(gamma: GammaCurve | None, series: str) -> list[dict[str, Any]]:
+    if gamma is None:
+        return []
+    rows = []
+    for index, code in enumerate(gamma.code):
+        rows.append(
+            csv_row(
+                "gamma",
+                series,
+                "sample",
+                "normalized_luminance",
+                index=index + 1,
+                label=int(code),
+                x=float(gamma.normalized_input[index]),
+                y=float(gamma.normalized_luminance[index]),
+                value=float(gamma.luminance[index]),
+                unit="cd/m2",
+                source=gamma.source,
+                notes=(
+                    f"code={int(code)}; y_std={float(gamma.y_std[index]):.6g}; "
+                    f"x_chromaticity={float(gamma.x_chromaticity[index]):.6g}; "
+                    f"y_chromaticity={float(gamma.y_chromaticity[index]):.6g}"
+                ),
+            )
+        )
+    for metric, value in (
+        ("gamma", gamma.gamma),
+        ("rms_gamma", gamma.rms_gamma),
+        ("rms_srgb", gamma.rms_srgb),
+        ("y_black", gamma.y_black),
+        ("y_max", gamma.y_max),
+        ("endpoint_drift_percent", gamma.endpoint_drift_percent),
+        ("samples_per_patch", gamma.samples_per_patch),
+    ):
+        rows.append(csv_row("gamma", series, "metric", metric, value=value, source=gamma.source))
+    return rows
+
+
+def contrast_csv_rows(contrast: ContrastCurve | None, series: str) -> list[dict[str, Any]]:
+    if contrast is None:
+        return []
+    rows = []
+    for index, brightness in enumerate(contrast.brightness):
+        rows.append(
+            csv_row(
+                "contrast",
+                series,
+                "sample",
+                "contrast_ratio",
+                index=index + 1,
+                label=contrast.contrast_display[index] if index < len(contrast.contrast_display) else "",
+                x=brightness,
+                y=contrast.contrast_ratio[index],
+                value=contrast.contrast_ratio[index],
+                unit="ratio",
+                source=contrast.source,
+                notes=f"lower_bound={contrast.lower_bound[index] if index < len(contrast.lower_bound) else False}",
+            )
+        )
+    rows.append(csv_row("contrast", series, "metric", "min_contrast_spec", value=contrast.min_spec, source=contrast.source))
+    rows.append(csv_row("contrast", series, "metric", "result", value=contrast.result, source=contrast.source))
+    return rows
+
+
+def gamut_reference_csv_rows(reference_gamut: str) -> list[dict[str, Any]]:
+    reference = REFERENCE_GAMUTS.get(reference_gamut, REFERENCE_GAMUTS["ntsc"])
+    rows = []
+    for label, point in (("R", reference["r"]), ("G", reference["g"]), ("B", reference["b"]), ("W", reference["w"])):
+        rows.append(
+            csv_row(
+                "gamut",
+                "reference",
+                "point",
+                "chromaticity",
+                label=label,
+                x=point[0],
+                y=point[1],
+                source=str(reference["name"]),
+            )
+        )
+    return rows
+
+
+def gamut_csv_rows(gamut: GamutMetrics | None, series: str) -> list[dict[str, Any]]:
+    if gamut is None:
+        return []
+    rows = []
+    for label in sorted(gamut.points):
+        point = gamut.points[label]
+        rows.append(
+            csv_row(
+                "gamut",
+                series,
+                "point",
+                "chromaticity",
+                label=label,
+                x=point[0],
+                y=point[1],
+                value=gamut.white_luminance if label == "W" else None,
+                unit="cd/m2" if label == "W" and gamut.white_luminance is not None else "",
+                source=gamut.source,
+                notes=f"backlight_temp_c={gamut.color_backlight_temps.get(label, '')}",
+            )
+        )
+    for metric, value, unit in (
+        ("coverage_percent", gamut.coverage_percent, "%"),
+        ("relative_area_percent", gamut.relative_area_percent, "%"),
+        ("measured_area", gamut.measured_area, "xy_area"),
+        ("reference_area", gamut.reference_area, "xy_area"),
+        ("overlap_area", gamut.overlap_area, "xy_area"),
+        ("white_delta_x", gamut.white_delta[0] if gamut.white_delta else None, "xy"),
+        ("white_delta_y", gamut.white_delta[1] if gamut.white_delta else None, "xy"),
+        ("white_tolerance_multiple", gamut.white_tolerance_distance, "multiple"),
+        ("white_within_tolerance", gamut.white_within_tolerance, ""),
+    ):
+        rows.append(csv_row("gamut", series, "metric", metric, value=value, unit=unit, source=gamut.source))
+    return rows
+
+
+def gamut_comparison_csv_rows(gamut: GamutMetrics | None, base_gamut: GamutMetrics | None) -> list[dict[str, Any]]:
+    rows = []
+    if gamut is not None and base_gamut is not None:
+        if gamut.coverage_percent is not None and base_gamut.coverage_percent is not None:
+            rows.append(csv_row("gamut", "delta", "metric", "coverage_delta_pp", value=gamut.coverage_percent - base_gamut.coverage_percent, unit="pp"))
+        if gamut.relative_area_percent is not None and base_gamut.relative_area_percent is not None:
+            rows.append(csv_row("gamut", "delta", "metric", "relative_area_delta_pp", value=gamut.relative_area_percent - base_gamut.relative_area_percent, unit="pp"))
+    return rows
+
+
+def white_point_reference_csv_rows(gamut: GamutMetrics | None) -> list[dict[str, Any]]:
+    reference_white = gamut.reference_white if gamut is not None else REFERENCE_GAMUTS["ntsc"]["w"]
+    return [
+        csv_row("zoom_gamut", "reference", "point", "white_point", label="D65", x=reference_white[0], y=reference_white[1]),
+        csv_row("zoom_gamut", "reference", "metric", "white_tolerance", value=DEFAULT_WHITE_TOLERANCE, unit="xy"),
+    ]
+
+
+def white_point_zoom_csv_rows(gamut: GamutMetrics | None, series: str) -> list[dict[str, Any]]:
+    if gamut is None or gamut.white_point is None:
+        return []
+    rows = [
+        csv_row(
+            "zoom_gamut",
+            series,
+            "point",
+            "white_point",
+            label="W",
+            x=gamut.white_point[0],
+            y=gamut.white_point[1],
+            value=gamut.white_luminance,
+            unit="cd/m2" if gamut.white_luminance is not None else "",
+            source=gamut.source,
+        )
+    ]
+    for metric, value, unit in (
+        ("d65_distance", white_point_distance(gamut), "xy"),
+        ("white_tolerance_multiple", gamut.white_tolerance_distance, "multiple"),
+        ("white_delta_x", gamut.white_delta[0] if gamut.white_delta else None, "xy"),
+        ("white_delta_y", gamut.white_delta[1] if gamut.white_delta else None, "xy"),
+    ):
+        rows.append(csv_row("zoom_gamut", series, "metric", metric, value=value, unit=unit, source=gamut.source))
+    return rows
+
+
+def white_point_zoom_comparison_csv_rows(gamut: GamutMetrics | None, base_gamut: GamutMetrics | None) -> list[dict[str, Any]]:
+    base_distance = white_point_distance(base_gamut)
+    run_distance = white_point_distance(gamut)
+    if base_distance is None or run_distance is None:
+        return []
+    return [csv_row("zoom_gamut", "delta", "metric", "d65_distance_delta", value=run_distance - base_distance, unit="xy")]
+
+
+def thermal_profile_csv_rows(profile: ThermalLuminanceProfile | None, series: str) -> list[dict[str, Any]]:
+    if profile is None:
+        return []
+    return [
+        csv_row(
+            "thermal_drift",
+            series,
+            "sample",
+            "white_point",
+            index=sample.index,
+            label=sample.timestamp,
+            x=sample.x_chromaticity,
+            y=sample.y_chromaticity,
+            value=sample.luminance,
+            unit="cd/m2",
+            source=profile.source,
+            notes=f"elapsed_seconds={sample.elapsed_seconds}; backlight_temp_c={sample.backlight_temp_c}",
+        )
+        for sample in profile.samples
+    ]
+
+
+def apl_csv_rows(apl: LocalDimmingAplCurve | None, series: str) -> list[dict[str, Any]]:
+    if apl is None:
+        return []
+    rows = []
+    for sample in apl.samples:
+        rows.append(
+            csv_row(
+                "local_dimming_apl",
+                series,
+                "sample",
+                "luminance",
+                index=sample.index,
+                label="measured" if sample.fits_screen else "skipped",
+                x=sample.apl_percent,
+                y=sample.luminance,
+                value=sample.luminance,
+                unit="cd/m2",
+                source=apl.source,
+                notes=(
+                    f"box_side_mm={sample.box_side_mm}; fits_screen={sample.fits_screen}; "
+                    f"x_chromaticity={sample.x_chromaticity}; y_chromaticity={sample.y_chromaticity}; "
+                    f"skip_reason={sample.skip_reason}"
+                ),
+            )
+        )
+    for metric, value in (
+        ("samples_attempted", apl.samples_attempted),
+        ("samples_collected", apl.samples_collected),
+        ("samples_skipped", apl.samples_skipped),
+        ("complete", apl.complete),
+        ("backlight_percent", apl.backlight_percent),
+    ):
+        rows.append(csv_row("local_dimming_apl", series, "metric", metric, value=value, source=apl.source))
+    return rows
 
 
 def render_header(ax: plt.Axes, run: RunData, title: str, base_run: RunData | None = None) -> None:
@@ -2258,7 +2659,7 @@ def render_white_point_zoom(
             label=f"{labels.run} white",
             zorder=7,
         )
-        add_white_point_zoom_badge(ax, gamut)
+    add_white_point_zoom_badge(ax, gamut, base_gamut, labels)
 
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
@@ -2270,20 +2671,28 @@ def render_white_point_zoom(
     ax.legend(loc="upper left", fontsize=5.4, frameon=False)
 
 
-def add_white_point_zoom_badge(ax: plt.Axes, gamut: GamutMetrics) -> None:
-    if gamut.white_point is None:
+def add_white_point_zoom_badge(
+    ax: plt.Axes,
+    gamut: GamutMetrics | None,
+    base_gamut: GamutMetrics | None = None,
+    labels: SeriesLabels | None = None,
+) -> None:
+    labels = labels or SeriesLabels(run="measured", base="base")
+    if base_gamut is not None:
+        lines = white_point_zoom_comparison_lines(gamut, base_gamut, labels)
+        if not lines:
+            return
+        text = "\n".join(lines)
+    elif gamut is not None and gamut.white_point is not None:
+        parts = white_point_zoom_summary_parts(gamut, include_delta=True)
+        text = " | ".join(parts[:2]) + ("\n" + " | ".join(parts[2:]) if len(parts) > 2 else "")
+    else:
         return
-    d65_distance = xy_distance(gamut.white_point, gamut.reference_white)
-    parts = [f"dD65 {d65_distance:.4f}"]
-    if gamut.white_tolerance_distance is not None:
-        parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
-    if gamut.white_delta is not None:
-        parts.append(f"dx {gamut.white_delta[0]:+.4f}")
-        parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+
     ax.text(
         0.985,
         0.025,
-        " | ".join(parts[:2]) + ("\n" + " | ".join(parts[2:]) if len(parts) > 2 else ""),
+        text,
         transform=ax.transAxes,
         fontsize=5.35,
         color="#3D4650",
@@ -2292,6 +2701,45 @@ def add_white_point_zoom_badge(ax: plt.Axes, gamut: GamutMetrics) -> None:
         linespacing=1.15,
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.1},
     )
+
+
+def white_point_distance(gamut: GamutMetrics | None) -> float | None:
+    if gamut is None or gamut.white_point is None:
+        return None
+    return xy_distance(gamut.white_point, gamut.reference_white)
+
+
+def white_point_zoom_summary_parts(gamut: GamutMetrics, include_delta: bool = False) -> list[str]:
+    d65_distance = white_point_distance(gamut)
+    if d65_distance is None:
+        return []
+    parts = [f"dD65 {d65_distance:.4f}"]
+    if gamut.white_tolerance_distance is not None:
+        parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
+    if include_delta and gamut.white_delta is not None:
+        parts.append(f"dx {gamut.white_delta[0]:+.4f}")
+        parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+    return parts
+
+
+def white_point_zoom_comparison_lines(
+    gamut: GamutMetrics | None,
+    base_gamut: GamutMetrics | None,
+    labels: SeriesLabels,
+) -> list[str]:
+    lines = []
+    for label, item in ((labels.base, base_gamut), (labels.run, gamut)):
+        if item is None or item.white_point is None:
+            continue
+        parts = white_point_zoom_summary_parts(item)
+        if parts:
+            lines.append(f"{shorten(label, 14)} " + " | ".join(parts))
+
+    base_distance = white_point_distance(base_gamut)
+    run_distance = white_point_distance(gamut)
+    if base_distance is not None and run_distance is not None:
+        lines.append(f"dD65 {run_distance - base_distance:+.4f}")
+    return lines
 
 
 def draw_white_reference(
@@ -2734,26 +3182,21 @@ def render_gamut(
     if gamut.white_point:
         white_label = f"{labels.run} white" if base_gamut is not None else "white"
         ax.plot(gamut.white_point[0], gamut.white_point[1], "o", color="#0072B2", markersize=3.0, label=white_label)
-        luminance_parts = []
-        coverage_parts = []
-        white_parts = []
-        if gamut.white_luminance is not None:
-            luminance_parts.append(f"full white peak {gamut.white_luminance:.1f} nits")
-        if gamut.coverage_percent is not None:
-            coverage_parts.append(f"cov {gamut.coverage_percent:.1f}%")
-        if gamut.relative_area_percent is not None:
-            coverage_parts.append(f"area {gamut.relative_area_percent:.1f}%")
-        if gamut.white_delta is not None:
-            white_parts.append(f"dx {gamut.white_delta[0]:+.4f}")
-            white_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
-        if gamut.white_tolerance_distance is not None:
-            white_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
-        temp_parts = gamut_temperature_annotation_parts(gamut)
-        annotation = "\n".join(
-            " | ".join(parts)
-            for parts in (luminance_parts, coverage_parts, white_parts, temp_parts)
-            if parts
-        )
+        if base_gamut is not None:
+            annotation = "\n".join(gamut_comparison_annotation_lines(gamut, base_gamut, labels))
+        else:
+            luminance_parts = []
+            if gamut.white_luminance is not None:
+                luminance_parts.append(f"full white peak {gamut.white_luminance:.1f} nits")
+            coverage_parts = gamut_area_summary_parts(gamut)
+            white_parts = []
+            if gamut.white_delta is not None:
+                white_parts.append(f"dx {gamut.white_delta[0]:+.4f}")
+                white_parts.append(f"dy {gamut.white_delta[1]:+.4f}")
+            if gamut.white_tolerance_distance is not None:
+                white_parts.append(f"{gamut.white_tolerance_distance:.2f}x tol")
+            temp_parts = gamut_temperature_annotation_parts(gamut)
+            annotation = "\n".join(" | ".join(parts) for parts in (luminance_parts, coverage_parts, white_parts, temp_parts) if parts)
         if annotation:
             ax.text(
                 0.98,
@@ -2774,6 +3217,41 @@ def render_gamut(
     if render_mode == "advanced":
         ax.set_aspect("auto", adjustable="box")
     ax.legend(loc="upper right", fontsize=5.7, frameon=False)
+
+
+def gamut_area_summary_parts(gamut: GamutMetrics) -> list[str]:
+    parts = []
+    if gamut.coverage_percent is not None:
+        parts.append(f"cov {gamut.coverage_percent:.1f}%")
+    if gamut.relative_area_percent is not None:
+        parts.append(f"area {gamut.relative_area_percent:.1f}%")
+    return parts
+
+
+def gamut_comparison_annotation_lines(
+    gamut: GamutMetrics | None,
+    base_gamut: GamutMetrics | None,
+    labels: SeriesLabels,
+) -> list[str]:
+    lines = []
+    for label, item in ((labels.base, base_gamut), (labels.run, gamut)):
+        if item is None:
+            continue
+        parts = []
+        if item.white_luminance is not None:
+            parts.append(f"peak {item.white_luminance:.1f} nits")
+        parts.extend(gamut_area_summary_parts(item))
+        if parts:
+            lines.append(f"{shorten(label, 14)} " + " | ".join(parts))
+
+    if (
+        gamut is not None
+        and base_gamut is not None
+        and gamut.coverage_percent is not None
+        and base_gamut.coverage_percent is not None
+    ):
+        lines.append(f"dCov {gamut.coverage_percent - base_gamut.coverage_percent:+.1f}pp")
+    return lines
 
 
 def gamut_temperature_annotation_parts(gamut: GamutMetrics) -> list[str]:
@@ -3019,6 +3497,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--base-label", default=None, help="Override baseline chart label in comparison mode.")
     parser.add_argument("--run-label", default=None, help="Override current-run chart label in comparison mode.")
     parser.add_argument("--output", type=Path, default=None, help="Output PNG path.")
+    parser.add_argument(
+        "--csv-output",
+        "--csvoutput",
+        "--csvdata",
+        dest="csv_output",
+        type=Path,
+        default=None,
+        help="Optional CSV path for the data used by the rendered chart panels.",
+    )
     parser.add_argument("--reference-gamut", choices=sorted(REFERENCE_GAMUTS), default="ntsc")
     parser.add_argument("--render", choices=["basic", "advanced"], default="basic", help="Gamut rendering mode.")
     parser.add_argument(
@@ -3029,6 +3516,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--dpi", type=int, default=DEFAULT_DPI)
     parser.add_argument("--resolution", type=parse_resolution, default=None, help="Output PNG size in pixels, e.g. 1920x1080.")
+    parser.add_argument(
+        "--custom-label",
+        "--custom_label",
+        dest="custom_label",
+        default=None,
+        help="Optional text label rendered at the bottom-left of the output PNG.",
+    )
     parser.add_argument("--title", default="Display Test Report Card")
     parser.add_argument("--serial-number", default=None, help="Override display serial number.")
     parser.add_argument("--tester-version", default=None, help="Override tester version.")
@@ -3057,6 +3551,7 @@ def main(argv: list[str] | None = None) -> int:
             args.run_label,
             args.base_label,
             args.resolution,
+            args.custom_label,
         )
     else:
         render_report_card(
@@ -3070,12 +3565,24 @@ def main(argv: list[str] | None = None) -> int:
             args.run_label,
             args.base_label,
             args.resolution,
+            args.custom_label,
         )
     if base_run:
         for warning in base_run.warnings:
             print(f"warning(base): {warning}", file=sys.stderr)
     for warning in run.warnings:
         print(f"warning(run): {warning}", file=sys.stderr)
+    if args.csv_output is not None:
+        write_csv_output(
+            args.csv_output,
+            run,
+            base_run,
+            args.panels,
+            args.reference_gamut,
+            args.run_label,
+            args.base_label,
+        )
+        print(f"wrote {args.csv_output}")
     print(f"wrote {output}")
     return 0
 

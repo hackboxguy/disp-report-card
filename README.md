@@ -77,11 +77,13 @@ Options:
 - `--base-input` - optional baseline result folder; when provided, report charts overlay baseline and run curves.
 - `--base-label` / `--run-label` - optional chart legend labels for comparison mode.
 - `--output` - output PNG path. Defaults to `<run_id>-report-card.png`.
+- `--csv-output` / `--csvoutput` / `--csvdata` - optional CSV path for the data used by the rendered chart panels.
 - `--reference-gamut` - one of `srgb`, `rec709`, `dcip3`, `ntsc`, or `rec2020`; default is `ntsc`.
 - `--render` - `basic` by default, or `advanced` for an optional CIE chromaticity background when `colour-science` is installed.
 - `--panels` - optional comma-separated chart-only output. Use `gamut,zoom_gamut` for gamut plus zoomed D65/white-point, or choose from `brightness`, `gamma`, `contrast`, `gamut`, `zoom_gamut`, `thermal_drift`, `local_dimming_apl`; `all` keeps the full report-card layout.
 - `--dpi` - output DPI, default `200`.
 - `--resolution` - optional output PNG size in pixels, for example `1920x720` or `1920x1080`.
+- `--custom-label` / `--custom_label` - optional text rendered at the bottom-left of the output PNG.
 - `--serial-number` - temporary header override.
 - `--tester-version` - temporary header override.
 
@@ -92,7 +94,9 @@ Chart-only examples:
   --input test-data/15-6-0od \
   --output out/15-6-gamut-panels.png \
   --panels gamut,zoom_gamut \
-  --resolution 1920x720
+  --resolution 1920x720 \
+  --custom_label "Gamut compared after white-point match" \
+  --csvoutput out/15-6-gamut-panels.csv
 ```
 
 ```bash
