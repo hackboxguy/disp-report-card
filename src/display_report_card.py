@@ -166,6 +166,10 @@ class BrightnessCurve:
     sample_count: int | None = None
     complete: bool | None = None
     from_cache: bool | None = None
+    # (brightness %, expected nits) from another source, drawn when the curve
+    # has no expected_luminance of its own - the linearity test's expectation
+    # over a calibration sweep, whose x values differ.
+    expected_overlay: list[tuple[float, float]] = field(default_factory=list)
 
 
 @dataclass
@@ -762,9 +766,16 @@ def comparison_status_rows(run: RunData, base_run: RunData | None) -> list[Statu
 def extract_brightness(run_dir: Path, tests: dict[str, RawTest]) -> tuple[BrightnessCurve | None, list[str]]:
     warnings: list[str] = []
     calibration = extract_brightness_calibration(run_dir, tests, warnings)
+    linearity = extract_brightness_linearity(tests)
+    # A calibration replayed from the cache was measured on another day; the
+    # linearity sweep was measured in this run, so it is the one to chart.
+    if calibration is not None and calibration.from_cache and linearity is not None:
+        return linearity, warnings
     if calibration is not None:
+        if linearity is not None and linearity.expected_luminance:
+            calibration.expected_overlay = list(zip(linearity.brightness_percent, linearity.expected_luminance))
         return calibration, warnings
-    return extract_brightness_linearity(tests), warnings
+    return linearity, warnings
 
 
 def extract_brightness_calibration(
@@ -2149,6 +2160,11 @@ def render_brightness(
         y = []
     if brightness is not None and brightness.expected_luminance and base_brightness is None:
         ax.plot(x, brightness.expected_luminance, "--", color="#6B7682", linewidth=1.0, label="expected")
+        all_luminance.extend(brightness.expected_luminance)
+    elif brightness is not None and brightness.expected_overlay and base_brightness is None:
+        ex, ey = zip(*brightness.expected_overlay)
+        ax.plot(ex, ey, "--", color="#6B7682", linewidth=1.0, label="expected")
+        all_luminance.extend(ey)
     ax.set_xlabel("Brightness command (%)", fontsize=7)
     ax.set_ylabel("Luminance Y (nits)", fontsize=7)
     ax.set_xlim(-2, 102)

@@ -486,8 +486,65 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
         self.assertTrue(run.brightness.complete)
         self.assertFalse(run.brightness.from_cache)
         self.assertEqual(run.brightness.expected_luminance, [])
+        self.assertEqual(run.brightness.expected_overlay, [(0.0, 0.0), (100.0, 999.0)])
         calibration_row = next(row for row in run.status_rows if row.name == "test-brightness-calibration")
         self.assertEqual(calibration_row.note, "3/3 samples")
+
+    def test_cached_brightness_calibration_yields_to_linearity_measured_this_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            raw_dir = run_dir / "raw"
+            artifact_dir = run_dir / "artifacts"
+            raw_dir.mkdir()
+            artifact_dir.mkdir()
+            write_json(run_dir / "summary.json", {"run_id": "brightness-cached"})
+            write_json(
+                raw_dir / "test-brightness-calibration.json",
+                {
+                    "test_info": {"name": "test-brightness-calibration", "category": "validation"},
+                    "execution": {"result": "SKIP"},
+                    "data": {
+                        "calibration_json": "artifacts/brightness-calibration-81step.json",
+                        "total_samples": 3,
+                        "samples_collected": 3,
+                        "from_cache": True,
+                    },
+                },
+            )
+            write_json(
+                raw_dir / "test-brightness-linearity.json",
+                {
+                    "test_info": {"name": "test-brightness-linearity", "category": "validation"},
+                    "execution": {"result": "PASS"},
+                    "data": {
+                        "measured_data": [
+                            {"brightness_percent": 0, "luminance": 0.0, "expected_luminance": 0.0},
+                            {"brightness_percent": 100, "luminance": 950.0, "expected_luminance": 999.0},
+                        ]
+                    },
+                },
+            )
+            write_json(
+                artifact_dir / "brightness-calibration-81step.json",
+                {
+                    "schema_version": "1.0",
+                    "total_samples": 3,
+                    "samples_collected": 3,
+                    "complete": True,
+                    "from_cache": True,
+                    "samples": [
+                        brightness_sample(1, 0.0, 0.0),
+                        brightness_sample(2, 1.25, 8.8),
+                        brightness_sample(3, 2.5, 29.7),
+                    ],
+                },
+            )
+
+            run = load_run_folder(run_dir, loader_args())
+
+        self.assertEqual(run.brightness.source, "test-brightness-linearity")
+        self.assertEqual(run.brightness.luminance, [0.0, 950.0])
+        self.assertEqual(run.brightness.expected_luminance, [0.0, 999.0])
 
     def test_missing_brightness_calibration_artifact_falls_back_to_linearity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
