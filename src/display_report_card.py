@@ -3359,7 +3359,9 @@ def render_footer(ax: plt.Axes, run: RunData, base_run: RunData | None = None) -
     ax.text(0.012, 0.68, "Observations", fontsize=8.2, weight="bold", color="#2D3845", transform=ax.transAxes)
     ax.text(0.012, 0.28, "  |  ".join(observations), fontsize=7.2, color="#4D5966", transform=ax.transAxes)
     if run.warnings:
-        ax.text(0.988, 0.28, f"{len(run.warnings)} warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
+        # On the heading row: the observations line below can run the full
+        # width, and a badge sharing it would print on top of the text.
+        ax.text(0.988, 0.68, f"{len(run.warnings)} warning(s)", ha="right", fontsize=6.8, color="#9A5B00", transform=ax.transAxes)
 
 
 def build_observations(run: RunData, base_run: RunData | None = None) -> list[str]:
