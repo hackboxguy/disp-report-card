@@ -1496,7 +1496,7 @@ def render_report_card(
     fig.patch.set_alpha(1.0)
     for ax in fig.axes:
         ax.patch.set_alpha(1.0)
-    add_render_timestamp(fig)
+    add_render_timestamp(fig, run.header.display_serial_number)
     add_custom_label(fig, custom_label)
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1538,7 +1538,7 @@ def render_report_panels(
         fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2, rect=(0.0, 0.045, 1.0, 1.0))
     else:
         fig.tight_layout(pad=1.2, w_pad=1.2, h_pad=1.2)
-    add_render_timestamp(fig)
+    add_render_timestamp(fig, run.header.display_serial_number)
     add_custom_label(fig, custom_label)
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1554,16 +1554,27 @@ def panel_grid_shape(panel_count: int) -> tuple[int, int]:
     return (math.ceil(panel_count / 3), 3)
 
 
-def render_timestamp_text(now: datetime | None = None) -> str:
+def footer_serial(serial: str | None) -> str | None:
+    # Placeholders ("unknown", "DUMMY-...") would read as a real serial on a
+    # printed report, so the footer leaves them out.
+    value = (serial or "").strip()
+    if not value or value.lower() in {"unknown", "tbd", "n/a"} or value.startswith("DUMMY"):
+        return None
+    return value
+
+
+def render_timestamp_text(now: datetime | None = None, serial: str | None = None) -> str:
     timestamp = (now or datetime.now().astimezone()).strftime("%Y-%m-%d %H:%M:%S %Z").strip()
-    return f"Generated: {timestamp}"
+    text = f"Generated: {timestamp}"
+    serial = footer_serial(serial)
+    return f"Serial: {serial} | {text}" if serial else text
 
 
-def add_render_timestamp(fig: plt.Figure) -> None:
+def add_render_timestamp(fig: plt.Figure, serial: str | None = None) -> None:
     fig.text(
         0.992,
         0.006,
-        render_timestamp_text(),
+        render_timestamp_text(serial=serial),
         ha="right",
         va="bottom",
         fontsize=6,

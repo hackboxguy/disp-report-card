@@ -297,6 +297,16 @@ class DisplayReportCardExtractionTest(unittest.TestCase):
 
         self.assertEqual(render_timestamp_text(value), "Generated: 2026-06-16 18:04:39 UTC")
 
+    def test_render_timestamp_text_prefixes_real_serial_only(self) -> None:
+        value = datetime(2026, 6, 16, 18, 4, 39, tzinfo=timezone.utc)
+
+        self.assertEqual(
+            render_timestamp_text(value, "7G02-E8M3-DN627"),
+            "Serial: 7G02-E8M3-DN627 | Generated: 2026-06-16 18:04:39 UTC",
+        )
+        for placeholder in (None, "", "unknown", "DUMMY-SERIAL-NUMBER"):
+            self.assertEqual(render_timestamp_text(value, placeholder), "Generated: 2026-06-16 18:04:39 UTC")
+
     def test_parse_args_accepts_custom_label_aliases(self) -> None:
         args = parse_args(["--input", "run", "--custom_label", "underscore label"])
         self.assertEqual(args.custom_label, "underscore label")
