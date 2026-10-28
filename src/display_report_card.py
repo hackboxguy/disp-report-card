@@ -3559,7 +3559,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv or sys.argv[1:])
+    argv = argv or sys.argv[1:]
+    if any(a == "--display-profile" or a.startswith("--display-profile=") for a in argv):
+        # a display profile JSON (the launcher's HDR Display Profile flow), not a result folder
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from display_profile_card import main as profile_main
+
+        return profile_main(argv)
+    args = parse_args(argv)
     try:
         run = load_run_folder(args.input, args)
         base_run = load_run_folder(args.base_input, args) if args.base_input else None

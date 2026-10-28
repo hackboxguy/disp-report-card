@@ -87,6 +87,21 @@ Options:
 - `--serial-number` - temporary header override.
 - `--tester-version` - temporary header override.
 
+### Display profile card
+
+`--display-profile=PROFILE.json` renders a one-page card for a display profile (sdr-hdr-shootout-demo's
+`display-profile/1`, made by `make-display-profile.py`) instead of a result folder: the tone response
+(the ramps the profile carries, the model ramp marked, the blacks), primaries and white against
+BT.709 / BT.2020, the peak by window size (local dimming) or by APL (OLED ABL), the key values (white,
+peaks, blacks, primaries, coverage, state, where the sensor sat and its footprint) and the creator's
+warnings, plus `--notes-file` lines (the launcher passes the `assumed:` lines of
+`make-display-profile.py --validate`). qt-demo-launcher's HDR Display Profile flow shows it in
+touch-gallery. Code: `src/display_profile_card.py` (installed next to the main script).
+
+```bash
+python3 src/display_report_card.py --display-profile=profile.json --output=card.png [--notes-file=notes.txt]
+```
+
 Chart-only examples:
 
 ```bash

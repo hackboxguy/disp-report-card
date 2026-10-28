@@ -15,7 +15,7 @@ LIBDIR ?= $(PREFIX)/lib/disp-report-card
 .PHONY: test report-samples report-samples-advanced compare clean distclean install uninstall
 
 test:
-	$(PYTHON) -m py_compile src/display_report_card.py tests/test_display_report_card.py
+	$(PYTHON) -m py_compile src/display_report_card.py src/display_profile_card.py tests/test_display_report_card.py tests/test_display_profile_card.py
 	$(PYTHON) -m unittest discover -s tests
 
 report-samples:
@@ -38,6 +38,7 @@ compare:
 install:
 	install -d "$(DESTDIR)$(LIBDIR)"
 	install -m 0644 $(REPORT) "$(DESTDIR)$(LIBDIR)/display_report_card.py"
+	install -m 0644 src/display_profile_card.py "$(DESTDIR)$(LIBDIR)/display_profile_card.py"
 	install -d "$(DESTDIR)$(BINDIR)"
 	printf '#!/bin/sh\nexec %s "%s/display_report_card.py" "$$@"\n' "$(PYTHON)" "$(LIBDIR)" > "$(DESTDIR)$(BINDIR)/display-report-card"
 	chmod 0755 "$(DESTDIR)$(BINDIR)/display-report-card"
