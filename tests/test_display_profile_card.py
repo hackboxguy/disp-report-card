@@ -39,6 +39,20 @@ class ProfileCardTest(unittest.TestCase):
         self.assertIn("in scene 0.1185 nits (measured)", text)
         self.assertIn("footprint 280 px", text)
 
+    def test_edgelit_state_line(self) -> None:
+        p = json.loads(json.dumps(PROFILE))
+        p["display"]["type"] = "edgelit"
+        p["state"].update({"local_dimming": None, "picture_mode": "User 1", "display_settings": {"vcp": {
+            "0x10": {"value": 100}, "0x12": {"value": 50}, "0x14": {"value": "0x0b", "label": "User 1"},
+            "0x16": {"value": 50}, "0x18": {"value": 50}, "0x1a": {"value": 50}, "0x87": {"value": 2}}}})
+        text = "\n".join(key_values(p))
+        self.assertIn("State (VCP): brightness 100, contrast 50, preset User 1, gains 50/50/50, sharpness 2", text)
+        self.assertNotIn("local dimming", text)
+        with tempfile.TemporaryDirectory() as d:
+            f, out = Path(d) / "p.json", Path(d) / "card.png"
+            f.write_text(json.dumps(p))
+            self.assertEqual(main([f"--display-profile={f}", f"--output={out}"]), 0)
+
     def test_renders(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             p, out = Path(d) / "p.json", Path(d) / "card.png"

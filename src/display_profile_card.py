@@ -181,10 +181,30 @@ def panel_peaks(ax: plt.Axes, p: dict[str, Any]) -> None:
         if pts:
             ax.plot([w for w, _ in pts], [n for _, n in pts], color="#0969DA", marker="o", ms=3)
             ax.set_xscale("log")
+            if (p.get("display") or {}).get("type") == "edgelit":
+                # one global backlight: the table should read as the flat line it is, not as
+                # autoscaled meter noise
+                ax.set_ylim(0, max(n for _, n in pts) * 1.15)
         ax.set_xlabel("window (% of the screen area)")
         ax.set_title("Peak by window size", loc="left", fontsize=11, weight="bold", color=INK)
     ax.set_ylabel("nits")
     ax.grid(True, which="both", alpha=0.25)
+
+
+def state_lines(d: dict[str, Any], st: dict[str, Any]) -> list[str]:
+    tail = (f"warm-up {st.get('warmup_min')} min, "
+            f"player {st.get('signal_path')} (offset {st.get('player_code_offset')})")
+    vcp = (st.get("display_settings") or {}).get("vcp") if isinstance(st.get("display_settings"), dict) else None
+    if d.get("type") == "edgelit" and vcp:
+        # an HDMI monitor: its settings are its VCPs (DDC/CI)
+        g = lambda k: (vcp.get(k) or {}).get("value", "?")
+        # two lines: one is wider than the card's text column
+        return [f"State (VCP): brightness {g('0x10')}, contrast {g('0x12')}, preset "
+                f"{st.get('picture_mode') or (vcp.get('0x14') or {}).get('label') or g('0x14')}, gains "
+                f"{g('0x16')}/{g('0x18')}/{g('0x1a')}, sharpness {g('0x87')}",
+                "   " + tail]
+    return [f"State: backlight {st.get('backlight_percent')} %, local dimming {st.get('local_dimming')}, "
+            f"panel {fmt(st.get('panel_temp_c'), 1, ' °C')}, " + tail]
 
 
 def key_values(p: dict[str, Any]) -> list[str]:
@@ -210,9 +230,7 @@ def key_values(p: dict[str, Any]) -> list[str]:
         "Primaries: " + "  ".join(f"{c} {prim[c][0]:.4f}, {prim[c][1]:.4f}" for c in "RGB" if c in prim),
         f"Coverage of BT.709 {fmt((coverage(prim, BT709) or 0) * 100, 1, ' %')}   of BT.2020 "
         f"{fmt((coverage(prim, BT2020) or 0) * 100, 1, ' %')}   additivity error {fmt(col.get('additivity_error_pct'), 2, ' %')}",
-        f"State: backlight {st.get('backlight_percent')} %, local dimming {st.get('local_dimming')}, "
-        f"panel {fmt(st.get('panel_temp_c'), 1, ' °C')}, warm-up {st.get('warmup_min')} min, "
-        f"player {st.get('signal_path')} (offset {st.get('player_code_offset')})",
+        *state_lines(d, st),
     ]
     loc = next((m for m in p.get("measurements") or [] if m.get("kind") == "sensor-location"), None)
     if loc:
